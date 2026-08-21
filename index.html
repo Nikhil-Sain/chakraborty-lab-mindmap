@@ -1,0 +1,1706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chakraborty Research Lab</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180deg,#eef2ff 0%,#f6f8fc 100%);color:#1e293b;display:flex;flex-direction:column}
+
+.hdr{height:52px;flex-shrink:0;display:flex;align-items:center;gap:14px;padding:0 18px;background:linear-gradient(120deg,#4338ca,#0891b2);box-shadow:0 2px 10px rgba(67,56,202,.25)}
+.hdr-logo{font-size:15px;font-weight:700;color:#eef2ff;white-space:nowrap}
+.hdr-spacer{flex:1}
+
+.main{padding:18px;flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.toolbar{display:none;flex-shrink:0;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.btn-toolbar{padding:7px 14px;border-radius:8px;border:1.5px dashed #c4b5fd;background:#faf5ff;color:#6d28d9;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.btn-toolbar:hover{background:#f2e8fe}
+.btn-toolbar:disabled{opacity:.4;cursor:not-allowed;background:#faf5ff}
+.btn-toolbar:disabled:hover{background:#faf5ff}
+
+/* ── Add-node shape buttons (one bright, distinctly-shaped control per depth) ── */
+.btn-shape{border:none;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;color:#111;box-shadow:0 2px 6px rgba(0,0,0,.18)}
+.btn-shape:hover{filter:brightness(1.08)}
+.btn-shape:active{filter:brightness(.95)}
+.shape-node{padding:8px 20px;background:#22c55e;font-size:12px;clip-path:polygon(0 0,100% 0,86% 50%,100% 100%,0 100%,14% 50%)}
+.shape-subnode{padding:8px 16px;background:#3b82f6;font-size:12px;color:#fff;clip-path:polygon(12% 0,88% 0,100% 14%,100% 86%,88% 100%,12% 100%,0 86%,0 14%)}
+.shape-subsubnode{padding:8px 24px 8px 18px;background:#f97316;font-size:12px;color:#3d1a02;clip-path:polygon(22% 0,100% 0,78% 100%,0 100%)}
+
+.thread-menu{position:fixed;display:none;flex-direction:column;gap:7px;background:#ffffff;border:1px solid #e0e7ff;padding:10px;border-radius:12px;z-index:150;box-shadow:0 12px 28px rgba(67,56,202,.18)}
+.thread-menu.open{display:flex}
+.thread-menu-row{display:flex;gap:6px}
+.thread-style-btn{padding:6px 10px;border-radius:6px;border:1.5px solid #e5e7eb;background:#f3f4f6;color:#374151;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.thread-style-btn:hover{background:#e5e7eb}
+.thread-style-btn.active{background:#7c3aed;border-color:#7c3aed;color:#fff}
+.thread-del-btn{padding:6px 10px;border-radius:6px;border:none;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.thread-del-btn{background:#fee2e2;color:#991b1b}
+.thread-del-btn:hover{background:#fecaca}
+.thread-palette{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}
+.thread-swatch{width:22px;height:22px;border-radius:5px;border:1.5px solid #e5e7eb;cursor:pointer;padding:0}
+.thread-swatch:hover{border-color:#7c3aed}
+.thread-color-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11.5px;font-weight:700;color:#374151;padding:2px 2px 2px 4px}
+.thread-color-input{width:44px;height:26px;padding:0;border:1.5px solid #e5e7eb;border-radius:6px;cursor:pointer;background:transparent}
+.thread-color-input::-webkit-color-swatch-wrapper{padding:2px}
+.thread-color-input::-webkit-color-swatch{border:none;border-radius:4px}
+.thread-color-input::-moz-color-swatch{border:none;border-radius:4px}
+.toolbar-hint{font-size:11px;color:#9ca3af}
+.node-actions{display:none;align-items:center;gap:8px;margin-left:auto}
+.node-actions.visible{display:flex}
+.btn-node-action{padding:7px 12px;border-radius:8px;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.btn-node-action:hover{filter:brightness(.95)}
+.btn-node-edit{background:#e0e7ff;color:#3730a3}
+.btn-node-connect{background:#d1fae5;color:#065f46}
+.btn-node-delete{background:#fee2e2;color:#991b1b}
+.member-heading{font-size:13px;font-weight:800;color:#1a1a2e;cursor:pointer;padding:4px 8px;border-radius:6px}
+.member-heading:hover{background:#f3f4f6}
+.member-heading::before{content:"👤 "}
+
+/* ── Mind map canvas ── */
+#map-wrap{position:relative;display:flex;background:#f1f5fb;border-radius:14px 14px 0 0;overflow:hidden;flex:1 1 auto;min-height:300px}
+#map-svg{flex:1;display:block;cursor:grab}
+#map-svg:active{cursor:grabbing}
+#map-empty{display:none;position:absolute;inset:0;align-items:center;justify-content:center;text-align:center;color:rgba(30,41,59,.45);font-size:13px;padding:40px}
+
+#detail-panel{width:0;flex-shrink:0;overflow:hidden;transition:width .25s cubic-bezier(.4,0,.2,1);background:#ffffff;border-left:1px solid #e0e7ff;box-shadow:-2px 0 12px rgba(67,56,202,.06)}
+#detail-panel.open{width:280px}
+#detail-inner{width:280px;padding:16px;height:100%;overflow-y:auto;color:#1e293b;position:relative}
+.detail-close{position:absolute;top:6px;right:6px;background:rgba(15,23,42,.06);border:none;color:rgba(15,23,42,.55);width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:11px}
+.detail-close:hover{background:rgba(15,23,42,.12)}
+.d-title{font-size:14px;font-weight:700;margin:16px 0 4px;color:#1e293b;line-height:1.4}
+.d-date{font-size:11px;color:#64748b;font-family:'Courier New',monospace;margin-bottom:3px}
+.d-created{font-size:10.5px;color:#94a3b8;font-family:'Courier New',monospace;margin-bottom:12px}
+.d-section{font-size:9px;font-weight:800;color:#7c3aed;text-transform:uppercase;letter-spacing:1px;margin:12px 0 6px}
+.d-bullets{list-style:decimal;padding-left:18px;margin:2px 0 0;font-size:12px;color:#334155;line-height:1.5}
+.d-bullets li{margin-bottom:4px}
+.d-kind-row{display:flex;gap:6px;flex-wrap:wrap}
+.d-kind-row .btn-shape{padding:5px 10px;font-size:10.5px;box-shadow:none;opacity:.5}
+.d-kind-row .btn-shape:hover{opacity:.8}
+.d-kind-row .btn-shape.d-kind-active{opacity:1;box-shadow:0 0 0 2px #7c3aed}
+.d-conn-chip{display:inline-block;padding:3px 9px;border-radius:7px;font-size:11px;background:rgba(124,58,237,.12);color:#6d28d9;cursor:pointer;margin:2px 4px 2px 0}
+.d-conn-chip:hover{background:rgba(124,58,237,.22)}
+.d-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:16px}
+.d-btn{padding:6px 10px;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+.d-btn.add{background:#ede9fe;color:#6d28d9}
+.d-btn.del{background:#fee2e2;color:#991b1b}
+.d-btn:hover{filter:brightness(.95)}
+
+.map-legend{flex-shrink:0;display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:#fff;padding:9px 14px;border-radius:0 0 14px 14px;box-shadow:0 1px 3px rgba(67,56,202,.08);font-size:11px;color:#6b7280}
+.map-controls{display:flex;gap:6px;margin-left:auto}
+.mc-btn{padding:5px 10px;border-radius:6px;border:1px solid #e0e7ff;background:#f5f7ff;color:#4338ca;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+.mc-btn:hover{background:#e0e7ff;color:#3730a3}
+
+.empty-state{padding:70px 20px;text-align:center;color:#9ca3af;font-size:13px}
+.inline-edit-input{width:100%;height:100%;box-sizing:border-box;background:rgba(15,23,42,.88);border:1px solid #818cf8;border-radius:4px;color:#fff;font-family:inherit;font-size:11px;padding:1px 5px;outline:none;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+
+/* ── Modals ── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:#fff;border-radius:14px;padding:22px;width:380px;max-width:92vw;box-shadow:0 20px 56px rgba(0,0,0,.18)}
+.modal h3{font-size:15px;font-weight:700;margin-bottom:14px;color:#1a1a2e}
+.fg{margin-bottom:12px}
+.fg label{display:block;font-size:11px;font-weight:700;color:#374151;margin-bottom:4px}
+.fg textarea,.fg input{width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:7px;font-size:13px;font-family:inherit;outline:none}
+.fg textarea{min-height:70px;resize:vertical}
+.fg textarea:focus,.fg input:focus{border-color:#a78bfa}
+.nm-text-hint{margin-top:4px;font-size:10px;color:#9ca3af;text-align:right}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+.btn{padding:7px 14px;border-radius:7px;border:none;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit}
+.btn-dismiss{background:#f3f4f6;color:#6b7280}
+.btn-dismiss:hover{background:#e5e7eb}
+.btn-save{background:#7c3aed;color:#fff}
+.btn-save:hover{background:#6d28d9}
+
+/* ── Inline description card (on the node itself) — a bullet-point list ── */
+.desc-card-inner{background:linear-gradient(160deg,#1e1b4b,#312e81);border:1.5px solid #818cf8;border-radius:8px;padding:8px;box-shadow:0 14px 30px rgba(49,46,129,.4),0 4px 12px rgba(0,0,0,.2);max-height:220px;overflow-y:auto;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif}
+.bullet-list{display:flex;flex-direction:column;gap:4px;margin-bottom:6px}
+.bullet-row{display:flex;align-items:flex-start;gap:5px}
+.bullet-mark{color:#c4b5fd;font-size:14px;line-height:1.5;flex-shrink:0;padding-top:4px}
+.bullet-textarea{flex:1;min-height:24px;background:#ffffff;border:1px solid #c7d2fe;border-radius:6px;color:#1e293b;font-size:11px;font-family:inherit;padding:5px 7px;resize:none;outline:none;overflow:hidden;box-sizing:border-box}
+.bullet-textarea:focus{border-color:#818cf8}
+.bullet-remove{cursor:pointer;color:rgba(255,255,255,.4);font-size:10px;flex-shrink:0;padding:6px 1px 0}
+.bullet-remove:hover{color:#f87171}
+.bullet-add{width:100%;padding:6px;border:1.5px dashed rgba(255,255,255,.32);border-radius:6px;background:transparent;color:rgba(255,255,255,.6);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+.bullet-add:hover{border-color:#c4b5fd;color:#c4b5fd}
+.bullet-hint{margin-top:6px;font-size:9.5px;color:rgba(255,255,255,.4);text-align:center}
+
+.connect-search{width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:7px 7px 0 0;border-bottom:none;font-size:13px;font-family:inherit;outline:none}
+.connect-list{max-height:260px;overflow-y:auto;border:1.5px solid #e5e7eb;border-radius:0 0 7px 7px;margin-bottom:14px}
+.connect-row{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;border-bottom:1px solid #f3f4f6;font-size:12px}
+.connect-row:last-child{border-bottom:none}
+.connect-row:hover{background:#faf5ff}
+.connect-row .cdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.connect-row .ctick{margin-left:auto;color:#059669;font-weight:700;font-size:11px;white-space:nowrap}
+
+::-webkit-scrollbar{height:7px;width:7px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:4px}
+#detail-inner::-webkit-scrollbar-thumb{background:#c7d2fe}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-logo">🔬 Chakraborty Research Lab</div>
+  <div class="hdr-spacer"></div>
+</div>
+
+<div class="main">
+  <div class="toolbar" id="toolbar">
+    <span class="member-heading" id="member-heading" onclick="renameMemberPrompt()" title="Click to rename member"></span>
+    <button class="btn-shape shape-node" onclick="addNodeOfType('node')" title="Add a top-level node under the current project">● Node</button>
+    <button class="btn-shape shape-subnode" onclick="addNodeOfType('sub')" title="Add a child of the selected node">■ Sub Node</button>
+    <button class="btn-shape shape-subsubnode" onclick="addNodeOfType('subsub')" title="Add a grandchild of the selected node">◆ Sub Sub Node</button>
+    <button class="btn-toolbar" onclick="addProject()">+ Add Project</button>
+    <button class="btn-toolbar" id="btn-undo" onclick="undo()" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
+    <button class="btn-toolbar" id="btn-redo" onclick="redo()" title="Redo (Ctrl+Y)" disabled>↷ Redo</button>
+    <span class="toolbar-hint" id="toolbar-hint"></span>
+    <div class="node-actions" id="node-actions">
+      <button class="btn-node-action btn-node-edit" onclick="editSelectedNode()">✎ Edit</button>
+      <button class="btn-node-action btn-node-connect" onclick="connectSelectedNode()">🔗 Connect</button>
+      <button class="btn-node-action btn-node-delete" onclick="deleteSelectedNode()">✕ Delete</button>
+    </div>
+  </div>
+  <div id="map-wrap">
+    <svg id="map-svg"></svg>
+    <div id="map-empty">No data yet.</div>
+    <div id="detail-panel">
+      <div id="detail-inner">
+        <button class="detail-close" onclick="closeDetail()">✕</button>
+        <div id="detail-content"></div>
+      </div>
+    </div>
+  </div>
+  <div class="map-legend" id="map-legend">
+    <div class="map-controls">
+      <button class="mc-btn" onclick="resetMapView()">Reset View</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ADD / EDIT NODE MODAL ── -->
+<div class="overlay" id="ov-node">
+  <div class="modal">
+    <h3 id="nm-title">Add Topic</h3>
+    <div class="fg">
+      <label>Text</label>
+      <textarea id="nm-text" placeholder="What is this about?" title="Max 5 words"></textarea>
+      <div class="nm-text-hint">Max 5 words</div>
+    </div>
+    <div class="fg">
+      <label>Date</label>
+      <input type="date" id="nm-date">
+    </div>
+    <div class="fg" id="nm-kind-fg" style="display:none">
+      <label>Type</label>
+      <div class="d-kind-row" id="nm-kind-row"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-dismiss" onclick="closeNodeModal()">Cancel</button>
+      <button class="btn btn-save" onclick="saveNodeModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── CONNECT MODAL ── -->
+<div class="overlay" id="ov-connect">
+  <div class="modal">
+    <h3>🔗 Connect Node</h3>
+    <input class="connect-search" id="connect-search" placeholder="Search topics…" oninput="renderConnectList()">
+    <div class="connect-list" id="connect-list"></div>
+    <div class="modal-footer">
+      <button class="btn btn-save" onclick="closeConnectModal()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── THREAD (CONNECTOR LINE) EDITOR ── -->
+<div id="thread-menu" class="thread-menu">
+  <div class="thread-menu-row">
+    <button class="thread-style-btn" data-style="solid" onclick="threadSetStyle('solid')">── Solid</button>
+    <button class="thread-style-btn" data-style="dashed" onclick="threadSetStyle('dashed')">┈┈ Dotted</button>
+  </div>
+  <div class="thread-palette" id="thread-palette"></div>
+  <label class="thread-color-row">
+    <span>Custom</span>
+    <input type="color" id="thread-color-input" class="thread-color-input" oninput="threadColorChanged(event)">
+  </label>
+  <button class="thread-del-btn" id="thread-del-btn" onclick="threadRemove()">✕ Remove connection</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>
+const PALETTE = ['#7c3aed','#0891b2','#d97706','#059669','#be185d','#2563eb','#ca8a04','#dc2626','#0d9488','#9333ea'];
+const DEFAULT_CONN_COLOR = '#8b5cf6';
+const DEFAULT_TREE_COLOR = '#6366f1';
+// Each week column cycles through a distinct cool tint so consecutive weeks are easy to
+// tell apart at a glance, with a slightly deeper header strip along the top of each.
+const WEEK_BAND_COLORS = [
+  { fill: '#f3f6ff', header: '#e2e9fd', border: '#a5b4fc' },
+  { fill: '#f1fafc', header: '#dcf3f7', border: '#7dd3e5' },
+  { fill: '#f6f4fd', header: '#e8e1fa', border: '#c4b5fd' },
+  { fill: '#f1faf8', header: '#dcf1ec', border: '#7fdbc4' }
+];
+const THREAD_WIDTH = 2.75;
+// A direction arrow centered at the origin, pointing along +x — placed at each thread's
+// midpoint (not one end) and rotated to match the curve's tangent there.
+const ARROW_SHAPE = 'M-6,-4.5 L6,0 L-6,4.5 Z';
+// Every topic cell renders in the exact shape/color of whichever add-button created it.
+const KIND_COLORS = {
+  node:   { fill: '#22c55e', stroke: '#16a34a', text: '#052e11' },
+  sub:    { fill: '#3b82f6', stroke: '#2563eb', text: '#ffffff' },
+  subsub: { fill: '#f97316', stroke: '#ea580c', text: '#3d1a02' }
+};
+let data = JSON.parse(localStorage.getItem('crl_data') || 'null') || { members: [], activeId: null };
+let nodeModalCallback = null;
+let mapRoot = null, mapZoom = null, mapSvgSel = null, mapInner = null, mapNodePositions = {}, mapNodeId = 0;
+let connectFromId = null, detailTopicId = null;
+let obstacleCache = []; // every topic cell's rect, refreshed once per render — curves check against this to route around cells they don't touch
+let undoStack = [], redoStack = [];
+const UNDO_LIMIT = 60;
+
+// Every mutation in the app already funnels through save() — hooking undo in here means
+// every add/edit/delete/drag/style change gets a history entry for free, with no need to
+// instrument each of the dozens of call sites individually.
+function save() {
+  try {
+    const prev = localStorage.getItem('crl_data');
+    if (prev) { undoStack.push(prev); if (undoStack.length > UNDO_LIMIT) undoStack.shift(); }
+    redoStack = [];
+    localStorage.setItem('crl_data', JSON.stringify(data));
+    updateUndoButtons();
+  }
+  catch (e) { alert('Storage is full — this browser only allows a few MB per site. Remove some attached images/files, or use smaller ones, then try again.'); }
+}
+function updateUndoButtons() {
+  const u = document.getElementById('btn-undo'); if (u) u.disabled = !undoStack.length;
+  const r = document.getElementById('btn-redo'); if (r) r.disabled = !redoStack.length;
+}
+function loadSnapshot(json) {
+  data = JSON.parse(json);
+  if (!data.activeId && data.members.length) data.activeId = data.members[0].id;
+  closeDetail(); closeThreadMenu();
+  renderAll();
+  updateUndoButtons();
+}
+function undo() {
+  if (!undoStack.length) return;
+  const current = localStorage.getItem('crl_data');
+  if (current) redoStack.push(current);
+  const prev = undoStack.pop();
+  localStorage.setItem('crl_data', prev);
+  loadSnapshot(prev);
+}
+function redo() {
+  if (!redoStack.length) return;
+  const current = localStorage.getItem('crl_data');
+  if (current) undoStack.push(current);
+  const next = redoStack.pop();
+  localStorage.setItem('crl_data', next);
+  loadSnapshot(next);
+}
+document.addEventListener('keydown', e => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const k = e.key.toLowerCase();
+  if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+  else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
+});
+const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const activeMember = () => data.members.find(m => m.id === data.activeId) || null;
+const todayStr = () => new Date().toISOString().slice(0, 10);
+const initials = s => (s || '').slice(0, 2).toUpperCase();
+const truncate = (s, n) => (s && s.length > n) ? s.slice(0, n) + '…' : (s || '');
+function formatDate(iso) {
+  if (!iso) return '';
+  const [y, mo, d] = iso.split('-').map(Number);
+  return new Date(y, mo - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+function formatTimestamp(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+// Older ids embed their creation time as a base36 prefix (genId = timestamp + 5 random chars).
+function idToTimestamp(id) {
+  const ts = parseInt(id.slice(0, Math.max(id.length - 5, 1)), 36);
+  return isNaN(ts) ? Date.now() : ts;
+}
+migrateData();
+
+// ── TEXT MEASUREMENT (for sizing week columns before rendering) ──────────
+const _measureCanvas = document.createElement('canvas');
+const _measureCtx = _measureCanvas.getContext('2d');
+function measureTextWidth(text, font) {
+  _measureCtx.font = font;
+  return _measureCtx.measureText(text).width;
+}
+const TOPIC_FONT = "10.5px 'Segoe UI', system-ui, sans-serif";
+
+// ── THREAD (LINE) EDITOR — click any connector, tree or cross-topic, to restyle it or
+// drag its ends onto a different node. Selecting a thread re-renders the map so its own
+// end-handles appear (and any other thread's handles disappear).
+let threadTarget = null; // { type: 'tree'|'conn', id }
+function threadRef() {
+  const m = activeMember(); if (!m || !threadTarget) return null;
+  return threadTarget.type === 'conn' ? findConnection(m, threadTarget.id) : findNode(m, threadTarget.id);
+}
+function openThreadMenu(event, target) {
+  event.stopPropagation();
+  threadTarget = target;
+  const ref = threadRef(); if (!ref) return;
+  const isConn = threadTarget.type === 'conn';
+  const style = isConn ? (ref.style || 'dashed') : (ref.linkStyle || 'solid');
+  const color = (isConn ? ref.color : ref.linkColor) || (isConn ? DEFAULT_CONN_COLOR : DEFAULT_TREE_COLOR);
+  const menu = document.getElementById('thread-menu');
+  menu.querySelectorAll('.thread-style-btn').forEach(b => b.classList.toggle('active', b.dataset.style === style));
+  document.getElementById('thread-color-input').value = color;
+  document.getElementById('thread-del-btn').style.display = isConn ? 'block' : 'none';
+  menu.style.left = event.clientX + 'px';
+  menu.style.top = event.clientY + 'px';
+  menu.classList.add('open');
+  if (mapRoot) mapUpdate(mapRoot);
+}
+function closeThreadMenu() {
+  const hadTarget = !!threadTarget;
+  document.getElementById('thread-menu').classList.remove('open');
+  threadTarget = null;
+  if (hadTarget && mapRoot) mapUpdate(mapRoot);
+}
+function threadSetStyle(style) {
+  const ref = threadRef(); if (!ref) return;
+  const menu = document.getElementById('thread-menu');
+  menu.querySelectorAll('.thread-style-btn').forEach(b => b.classList.toggle('active', b.dataset.style === style));
+  if (threadTarget.type === 'conn') ref.style = style; else ref.linkStyle = style;
+  save(); buildD3Map();
+}
+function threadColorChanged(event) {
+  const ref = threadRef(); if (!ref) return;
+  if (threadTarget.type === 'conn') ref.color = event.target.value; else ref.linkColor = event.target.value;
+  save(); buildD3Map();
+}
+// A quick-pick row of primary colors, shown above the custom color swatch.
+const THREAD_PALETTE = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#78716c', '#ffffff', '#a78bfa', '#c7c9ea'];
+document.getElementById('thread-palette').innerHTML = THREAD_PALETTE.map(c =>
+  `<button class="thread-swatch" style="background:${c}" title="${c}" onclick="threadPickPaletteColor('${c}')"></button>`
+).join('');
+function threadPickPaletteColor(c) {
+  document.getElementById('thread-color-input').value = c;
+  threadColorChanged({ target: { value: c } });
+}
+function threadRemove() {
+  if (threadTarget && threadTarget.type === 'conn') {
+    const conn = threadRef();
+    if (conn) removeConnection(conn.a, conn.b);
+  }
+  closeThreadMenu();
+}
+document.addEventListener('click', e => { if (!e.target.closest('#thread-menu')) closeThreadMenu(); });
+
+// Migrate any older saved data (weeks were once user-managed containers) into the flat topics model,
+// and backfill fields added later (createdAt / bullet-point description) on pre-existing topics.
+// Descriptions used to be one free-text blob and topics could carry file/image attachments —
+// both are folded into a single bullet-point list now, so an old blob becomes its first bullet
+// and any attachments are dropped (there's no attachment UI to view them in any more).
+function migrateData() {
+  function backfill(nodes) {
+    nodes.forEach(n => {
+      if (!n.createdAt) n.createdAt = idToTimestamp(n.id);
+      if (!n.bullets) n.bullets = (n.desc && n.desc.trim()) ? [n.desc.trim()] : [];
+      delete n.desc;
+      delete n.media;
+      if (!n.kind) n.kind = 'sub';
+      backfill(n.children || []);
+    });
+  }
+  (data.members || []).forEach(m => {
+    if (!m.topics) {
+      m.topics = [];
+      (m.weeks || []).forEach(w => (w.nodes || []).forEach(n => m.topics.push(n)));
+      delete m.weeks;
+    }
+    if (!m.connections) m.connections = [];
+    // Older connections were plain [a,b] pairs; upgrade to objects so each link can carry its own color.
+    m.connections = m.connections.map(c => Array.isArray(c) ? { id: genId(), a: c[0], b: c[1], color: DEFAULT_CONN_COLOR } : c);
+    if (!('lastTopicId' in m)) m.lastTopicId = null;
+    if (!m.projects) {
+      const proj = { id: genId(), name: m.projectName || 'New Project' };
+      m.projects = [proj];
+    }
+    delete m.projectName;
+    m.topics.forEach(t => { if (!t.projectId) t.projectId = m.projects[0].id; });
+    if (!m.lastProjectId || !m.projects.some(p => p.id === m.lastProjectId)) m.lastProjectId = m.projects[0].id;
+    backfill(m.topics);
+  });
+}
+
+// ── MEMBER ───────────────────────────────────────────────────────────────
+// The app is a single-workspace notebook now (no member switching UI) — if there's ever
+// no member on record (first run, or localStorage was cleared), silently provision one
+// instead of requiring a dedicated "Add Member" control.
+function ensureMember() {
+  if (data.members.length) return;
+  const name = (prompt('Your name:') || '').trim() || 'Lab Notebook';
+  const projId = genId();
+  const m = { id: genId(), name, projects: [{ id: projId, name: 'New Project' }], lastProjectId: projId, color: PALETTE[0], topics: [], connections: [], lastTopicId: null };
+  data.members.push(m);
+  data.activeId = m.id;
+  save();
+}
+function renameMemberPrompt() {
+  const m = activeMember(); if (!m) return;
+  const v = prompt('Member name:', m.name);
+  if (v === null || !v.trim()) return;
+  m.name = v.trim();
+  save(); renderAll();
+}
+
+// ── PROJECTS (each member can run several independent projects, each its own root circle) ──
+function addProject() {
+  const m = activeMember(); if (!m) return;
+  const name = prompt('Project name:', 'New Project');
+  if (name === null || !name.trim()) return;
+  const p = { id: genId(), name: name.trim() };
+  m.projects.push(p);
+  m.lastProjectId = p.id;
+  m.lastTopicId = null;
+  save(); buildD3Map();
+}
+function deleteProject(id) {
+  const m = activeMember(); if (!m) return;
+  if (m.projects.length <= 1) { alert('A member must have at least one project.'); return; }
+  const p = m.projects.find(x => x.id === id); if (!p) return;
+  if (!confirm(`Delete project "${p.name}" and all its topics? This cannot be undone.`)) return;
+  let removedIds = [];
+  m.topics.filter(t => t.projectId === id).forEach(t => { removedIds = removedIds.concat(collectIds(t)); });
+  pruneConnections(m, removedIds);
+  m.topics = m.topics.filter(t => t.projectId !== id);
+  m.projects = m.projects.filter(x => x.id !== id);
+  if (m.lastProjectId === id) m.lastProjectId = m.projects[0].id;
+  if (removedIds.includes(m.lastTopicId)) m.lastTopicId = null;
+  save(); closeDetail(); buildD3Map();
+}
+
+// ── NODES ────────────────────────────────────────────────────────────────
+function collectIds(node) {
+  let ids = [node.id];
+  (node.children || []).forEach(c => ids = ids.concat(collectIds(c)));
+  return ids;
+}
+function pruneConnections(m, removedIds) {
+  const set = new Set(removedIds);
+  m.connections = m.connections.filter(c => !set.has(c.a) && !set.has(c.b));
+}
+function searchArr(arr, id) {
+  for (const n of arr) { if (n.id === id) return n; const f = searchArr(n.children || [], id); if (f) return f; }
+  return null;
+}
+function findNode(m, id) { if (!m) return null; return searchArr(m.topics, id); }
+function searchParent(arr, id) {
+  for (const n of arr) { if (n.id === id) return arr; const r = searchParent(n.children || [], id); if (r) return r; }
+  return null;
+}
+function findParentArray(m, id) { return searchParent(m.topics, id); }
+// The specific topic a node hangs from in the trail (its "previous" node) — null if it's a
+// top-level topic (its "previous" is the project root itself, not another topic).
+function searchParentNode(arr, id, parent) {
+  for (const n of arr) {
+    if (n.id === id) return parent;
+    const found = searchParentNode(n.children || [], id, n);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+function findParentNode(m, id) { const r = searchParentNode(m.topics, id, null); return r === undefined ? null : r; }
+function countTopics(arr) { return arr.reduce((s, n) => s + 1 + countTopics(n.children || []), 0); }
+function allTopicNodes(arr, acc) { arr.forEach(n => { acc.push(n); allTopicNodes(n.children || [], acc); }); return acc; }
+
+// ── ADD / EDIT MODAL (text + date, plus a type switcher when editing an existing node) ──
+function renderKindRow(id, kind) {
+  document.getElementById('nm-kind-row').innerHTML = ['node', 'sub', 'subsub'].map(k => {
+    const cls = k === 'node' ? 'shape-node' : k === 'sub' ? 'shape-subnode' : 'shape-subsubnode';
+    const active = (kind || 'sub') === k ? ' d-kind-active' : '';
+    return `<button type="button" class="btn-shape ${cls} d-kind-btn${active}" onclick="setNodeKind('${id}','${k}')" title="Switch to ${KIND_LABEL[k]}">${KIND_LABEL[k]}</button>`;
+  }).join('');
+}
+const NODE_TEXT_MAX_WORDS = 5;
+function openNodeModal(title, initialText, initialDate, cb, kindNode) {
+  document.getElementById('nm-title').textContent = title;
+  document.getElementById('nm-text').value = initialText || '';
+  document.getElementById('nm-date').value = initialDate || todayStr();
+  nodeModalCallback = cb;
+  const kindFg = document.getElementById('nm-kind-fg');
+  if (kindNode) { kindFg.style.display = ''; renderKindRow(kindNode.id, kindNode.kind); }
+  else kindFg.style.display = 'none';
+  document.getElementById('ov-node').classList.add('open');
+  setTimeout(() => document.getElementById('nm-text').focus(), 50);
+}
+document.getElementById('nm-text').addEventListener('input', function () {
+  applyWordCap(this, NODE_TEXT_MAX_WORDS);
+});
+function closeNodeModal() { document.getElementById('ov-node').classList.remove('open'); nodeModalCallback = null; }
+function saveNodeModal() {
+  const text = limitWords(document.getElementById('nm-text').value.trim(), NODE_TEXT_MAX_WORDS);
+  const dateVal = document.getElementById('nm-date').value;
+  if (!text) { alert('Please enter some text.'); return; }
+  const cb = nodeModalCallback;
+  closeNodeModal();
+  if (cb) cb(text, dateVal);
+}
+document.getElementById('ov-node').addEventListener('click', e => { if (e.target.id === 'ov-node') closeNodeModal(); });
+document.getElementById('ov-connect').addEventListener('click', e => { if (e.target.id === 'ov-connect') closeConnectModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeNodeModal(); closeConnectModal(); } });
+
+const KIND_LABEL = { node: 'Node', sub: 'Sub Node', subsub: 'Sub Sub Node' };
+// All three buttons attach the new entry to whatever is currently selected (the anchor) —
+// only when nothing is selected does it fall back to the active project's root. 'kind' only
+// controls the new cell's shape/color; it never overrides where it connects from.
+function addNodeOfType(kind, presetDate) {
+  const m = activeMember(); if (!m) return;
+  const label = KIND_LABEL[kind]; if (!label) return;
+  const proj = m.projects.find(p => p.id === m.lastProjectId) || m.projects[0];
+  const anchor = m.lastTopicId ? findNode(m, m.lastTopicId) : null;
+  const title = anchor ? `Add ${label} under "${truncate(anchor.text, 26)}"` : `Add ${label} to "${proj.name}"`;
+  openNodeModal(title, '', presetDate || todayStr(), (text, dateVal) => {
+    const newTopic = { id: genId(), text, date: dateVal, kind, bullets: [], createdAt: Date.now(), children: [] };
+    if (anchor) { anchor.children = anchor.children || []; anchor.children.push(newTopic); }
+    else { newTopic.projectId = proj.id; m.topics.push(newTopic); }
+    m.lastTopicId = newTopic.id;
+    save(); buildD3Map();
+  });
+}
+
+function renameNode(id) {
+  const m = activeMember(); const node = findNode(m, id); if (!node) return;
+  openNodeModal('Edit Node', node.text, node.date, (text, dateVal) => {
+    node.text = text; node.date = dateVal;
+    save(); buildD3Map();
+    if (detailTopicId === id) showTopicDetail(node);
+  }, node);
+}
+// Switches a node between Node / Sub Node / Sub Sub Node — only its shape/color/size
+// changes; the tree position (who it's connected from and to) is untouched.
+function setNodeKind(id, kind) {
+  if (!KIND_LABEL[kind]) return;
+  const node = findNode(activeMember(), id); if (!node || node.kind === kind) return;
+  node.kind = kind;
+  save(); buildD3Map();
+  if (detailTopicId === id) showTopicDetail(node);
+  if (document.getElementById('ov-node').classList.contains('open')) renderKindRow(id, kind);
+}
+// Deletes only the one selected node — its own sub-nodes are kept and moved up
+// into its place, rather than being wiped out along with it.
+function deleteNode(id) {
+  const m = activeMember(); const arr = findParentArray(m, id); if (!arr) return;
+  const idx = arr.findIndex(n => n.id === id);
+  if (idx === -1) return;
+  const node = arr[idx];
+  const kids = node.children || [];
+  const msg = kids.length
+    ? `Delete "${node.text}"? Its ${kids.length} sub-node${kids.length !== 1 ? 's' : ''} will move up in its place.`
+    : `Delete "${node.text}"?`;
+  if (!confirm(msg)) return;
+  pruneConnections(m, [id]);
+  // A top-level topic carries its project on itself (its parent array is m.topics, not
+  // another node's children) — promoted children need that same projectId, or they'd be
+  // silently filtered out of every project (i.e. vanish from the map) once spliced in.
+  if (node.projectId) kids.forEach(k => { k.projectId = node.projectId; });
+  arr.splice(idx, 1, ...kids);
+  if (m.lastTopicId === id) m.lastTopicId = null;
+  save(); closeDetail(); buildD3Map();
+}
+// The Edit/Connect/Delete buttons live in the toolbar now (not the detail panel), so they
+// always act on whichever topic is currently selected rather than a specific baked-in id.
+function editSelectedNode() { if (detailTopicId) renameNode(detailTopicId); }
+function connectSelectedNode() { if (detailTopicId) openConnectModal(detailTopicId); }
+function deleteSelectedNode() { if (detailTopicId) deleteNode(detailTopicId); }
+function removeConnection(a, b) {
+  const m = activeMember(); if (!m) return;
+  m.connections = m.connections.filter(c => !((c.a === a && c.b === b) || (c.a === b && c.b === a)));
+  save(); buildD3Map();
+  if (detailTopicId === a || detailTopicId === b) { const n = findNode(m, detailTopicId); if (n) showTopicDetail(n); }
+}
+function findConnection(m, id) { return (m.connections || []).find(c => c.id === id) || null; }
+
+// ── CONNECT MODAL ────────────────────────────────────────────────────────
+function openConnectModal(nodeId) {
+  connectFromId = nodeId;
+  document.getElementById('connect-search').value = '';
+  renderConnectList();
+  document.getElementById('ov-connect').classList.add('open');
+}
+function closeConnectModal() {
+  const ov = document.getElementById('ov-connect');
+  if (!ov.classList.contains('open')) { connectFromId = null; return; }
+  ov.classList.remove('open');
+  connectFromId = null;
+  if (detailTopicId) { const m = activeMember(); const n = findNode(m, detailTopicId); if (n) showTopicDetail(n); }
+  buildD3Map();
+}
+function renderConnectList() {
+  const m = activeMember(); if (!m) return;
+  const q = document.getElementById('connect-search').value.toLowerCase();
+  let all = allTopicNodes(m.topics, []).filter(n => n.id !== connectFromId && (!q || n.text.toLowerCase().includes(q)));
+  const list = document.getElementById('connect-list');
+  list.innerHTML = all.map(n => {
+    const connected = m.connections.some(c => (c.a === connectFromId && c.b === n.id) || (c.a === n.id && c.b === connectFromId));
+    return `<div class="connect-row" onclick="toggleConnectRow('${n.id}')">
+      <span class="cdot" style="background:${m.color}"></span>
+      <span>${escapeHtml(truncate(n.text, 38))}${n.date ? ' · ' + formatDate(n.date) : ''}</span>
+      ${connected ? '<span class="ctick">✓ linked</span>' : ''}
+    </div>`;
+  }).join('') || `<div style="padding:14px;text-align:center;color:#9ca3af;font-size:12px">No other topics yet.</div>`;
+}
+function toggleConnectRow(id) {
+  const m = activeMember();
+  const exists = m.connections.some(c => (c.a === connectFromId && c.b === id) || (c.a === id && c.b === connectFromId));
+  if (exists) m.connections = m.connections.filter(c => !((c.a === connectFromId && c.b === id) || (c.a === id && c.b === connectFromId)));
+  else m.connections.push({ id: genId(), a: connectFromId, b: id, color: DEFAULT_CONN_COLOR });
+  save(); renderConnectList();
+}
+
+// ── DETAIL PANEL ─────────────────────────────────────────────────────────
+function resizeMapForPanel() {
+  const wrap = document.getElementById('map-wrap');
+  const panelW = document.getElementById('detail-panel').classList.contains('open') ? 280 : 0;
+  if (mapSvgSel) mapSvgSel.attr('width', wrap.clientWidth - panelW);
+}
+function closeDetail() {
+  document.getElementById('detail-panel').classList.remove('open');
+  detailTopicId = null;
+  document.getElementById('node-actions').classList.remove('visible');
+  resizeMapForPanel();
+}
+function showRootDetail(m, projectId) {
+  detailTopicId = null;
+  document.getElementById('node-actions').classList.remove('visible');
+  const p = m.projects.find(pr => pr.id === projectId); if (!p) return;
+  document.getElementById('detail-panel').classList.add('open');
+  const count = countTopics(m.topics.filter(t => t.projectId === p.id));
+  const canDelete = m.projects.length > 1;
+  document.getElementById('detail-content').innerHTML = `
+    <div class="d-title">${escapeHtml(p.name)}</div>
+    <div class="d-date">👤 ${escapeHtml(m.name)} · ${count} topic${count !== 1 ? 's' : ''} total</div>
+    <div class="d-section">Start a new branch</div>
+    <div style="font-size:11px;color:rgba(255,255,255,.45);line-height:1.5;margin-bottom:4px">Adds a fresh top-level topic directly under this project, separate from any existing trail.</div>
+    <div class="d-actions">
+      <button class="d-btn add" onclick="addNodeOfType('node')">+ Add Node</button>
+      ${canDelete ? `<button class="d-btn del" onclick="deleteProject('${p.id}')">✕ Delete Project</button>` : ''}
+    </div>`;
+  resizeMapForPanel();
+}
+function showTopicDetail(n) {
+  if (!n) return;
+  detailTopicId = n.id;
+  const m = activeMember();
+  document.getElementById('detail-panel').classList.add('open');
+  const conns = (m.connections || []).filter(c => c.a === n.id || c.b === n.id)
+    .map(c => findNode(m, c.a === n.id ? c.b : c.a)).filter(Boolean);
+  const wk = weekOfYear(n.date);
+  const bullets = (n.bullets || []).filter(b => b && b.trim());
+  const bulletsHtml = bullets.length
+    ? `<ol class="d-bullets">${bullets.map(b => `<li>${escapeHtml(b)}</li>`).join('')}</ol>`
+    : `<div style="font-size:11px;color:rgba(255,255,255,.4)">No points yet — hover this entry in the map to add some.</div>`;
+  let html = `
+    <div class="d-title">${escapeHtml(n.text)}</div>
+    <div class="d-date">${n.date ? ('🗓 ' + formatDate(n.date)) : 'No date set'} · Week ${wk.weekNum} (${formatWeekRange(wk.weekStart, wk.weekEnd)})</div>
+    <div class="d-created">🕒 Created ${formatTimestamp(n.createdAt)}</div>
+    <div class="d-section">Description</div>
+    ${bulletsHtml}`;
+  const parentNode = findParentNode(m, n.id);
+  if (parentNode) {
+    html += `<div class="d-section">Connected from</div>
+      <span class="d-conn-chip" onclick="showTopicDetail(findNode(activeMember(),'${parentNode.id}'))">${escapeHtml(truncate(parentNode.text, 26))}</span>`;
+  } else {
+    const proj = m.projects.find(p => p.id === n.projectId);
+    if (proj) {
+      html += `<div class="d-section">Connected from</div>
+        <span class="d-conn-chip" onclick="showRootDetail(activeMember(), '${proj.id}')">${escapeHtml(truncate(proj.name, 26))}</span>`;
+    }
+  }
+  if (n.children && n.children.length) {
+    html += `<div class="d-section">Sub-nodes (${n.children.length})</div>`;
+    n.children.forEach(c => { html += `<span class="d-conn-chip" onclick="showTopicDetail(findNode(activeMember(),'${c.id}'))">${escapeHtml(truncate(c.text, 26))}</span>`; });
+  }
+  if (conns.length) {
+    html += `<div class="d-section">Connected to</div>`;
+    conns.forEach(c => { html += `<span class="d-conn-chip" onclick="showTopicDetail(findNode(activeMember(),'${c.id}'))">${escapeHtml(truncate(c.text, 26))}</span>`; });
+  }
+  document.getElementById('detail-content').innerHTML = html;
+  document.getElementById('node-actions').classList.add('visible');
+  resizeMapForPanel();
+}
+
+function renderAll() { closeDetail(); buildD3Map(); }
+
+// ── CALENDAR WEEK HELPERS ────────────────────────────────────────────────
+// Real calendar weeks, Sunday through Saturday — the week a date belongs to is whichever
+// Sunday-Saturday span actually contains it, not an arbitrary day-count from Jan 1.
+function sundayOf(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  d.setDate(d.getDate() - d.getDay()); // getDay(): 0=Sun..6=Sat, so this always lands on Sunday
+  return d;
+}
+function yearSunday(year) { return sundayOf(new Date(year, 0, 1)); }
+function weekIndexToDates(year, idx) {
+  const weekStart = new Date(yearSunday(year));
+  weekStart.setDate(weekStart.getDate() + idx * 7);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  return { weekStart, weekEnd };
+}
+function weekOfYear(dateStr) {
+  const d = new Date((dateStr || todayStr()) + 'T00:00:00');
+  const sunday = sundayOf(d);
+  const year = sunday.getFullYear();
+  const weekIndex = Math.round((sunday - yearSunday(year)) / 604800000);
+  const weekEnd = new Date(sunday); weekEnd.setDate(sunday.getDate() + 6);
+  return { year, weekIndex, weekNum: weekIndex + 1, weekStart: sunday, weekEnd };
+}
+function formatWeekRange(ws, we) {
+  const sameMonth = ws.getMonth() === we.getMonth();
+  const s = ws.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const e = sameMonth ? we.getDate() : we.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `${s}–${e}`;
+}
+function computeWeekRange(m) {
+  const flat = allTopicNodes(m.topics, []);
+  const now = weekOfYear(todayStr());
+  if (!flat.length) return { year: now.year, minIdx: Math.max(0, now.weekIndex - 1), maxIdx: now.weekIndex + 2 };
+  const infos = flat.map(t => weekOfYear(t.date));
+  const year = infos[0].year;
+  const idxs = infos.filter(w => w.year === year).map(w => w.weekIndex);
+  if (!idxs.length) return { year, minIdx: Math.max(0, now.weekIndex - 1), maxIdx: now.weekIndex + 2 };
+  const minIdx = Math.max(0, Math.min(...idxs) - 1);
+  const maxIdx = Math.max(...idxs) + 1;
+  return { year, minIdx, maxIdx };
+}
+
+// ── TREE DATA (root -> topics -> sub-topics only; weeks are a background, not a node) ──
+function mapTopic(n) {
+  return { id: n.id, type: 'topic', name: n.text, date: n.date, nodeRef: n, children: (n.children || []).map(mapTopic) };
+}
+function buildTree(m) {
+  // An invisible super-root wraps one visible root circle per project, so a single
+  // d3.hierarchy can hold several independent trails that all share the week-column canvas.
+  return {
+    id: '__super__', type: 'super', name: '',
+    children: (m.projects || []).map(p => {
+      const topics = m.topics.filter(t => t.projectId === p.id);
+      return { id: p.id, type: 'root', name: p.name, color: m.color, projectId: p.id, count: countTopics(topics), children: topics.map(mapTopic) };
+    })
+  };
+}
+function updateToolbarHint() {
+  const m = activeMember(); if (!m) return;
+  document.getElementById('member-heading').textContent = m.name;
+  const el = document.getElementById('toolbar-hint');
+  if (m.lastTopicId) {
+    const n = findNode(m, m.lastTopicId);
+    el.textContent = n ? `Continuing from "${truncate(n.text, 30)}" — click any node to change` : '';
+  } else {
+    const p = m.projects.find(pr => pr.id === m.lastProjectId) || m.projects[0];
+    el.textContent = `Starting a fresh topic under "${p ? p.name : 'New Project'}" — click any topic to continue from it instead`;
+  }
+}
+
+// ── D3 MIND MAP ──────────────────────────────────────────────────────────
+function buildD3Map() {
+  const m = activeMember();
+  const svgEl = document.getElementById('map-svg');
+  const emptyEl = document.getElementById('map-empty');
+  const legendEl = document.getElementById('map-legend');
+  const toolbarEl = document.getElementById('toolbar');
+  if (!m) {
+    svgEl.style.display = 'none'; emptyEl.style.display = 'flex'; legendEl.style.display = 'none'; toolbarEl.style.display = 'none';
+    return;
+  }
+  svgEl.style.display = 'block'; emptyEl.style.display = 'none'; legendEl.style.display = 'flex'; toolbarEl.style.display = 'flex';
+  updateToolbarHint();
+
+  const wrap = document.getElementById('map-wrap');
+  const panelW = document.getElementById('detail-panel').classList.contains('open') ? 280 : 0;
+  const W = wrap.clientWidth - panelW, H = wrap.clientHeight;
+
+  const svg = d3.select('#map-svg').attr('width', W).attr('height', H);
+  svg.selectAll('*').remove();
+
+  mapZoom = d3.zoom().scaleExtent([0.25, 2.4]).on('zoom', e => mapInner.attr('transform', e.transform));
+  svg.call(mapZoom);
+  mapInner = svg.append('g');
+  mapInner.append('g').attr('class', 'bands-layer');
+  mapSvgSel = svg;
+
+  const treeData = buildTree(m);
+  mapRoot = d3.hierarchy(treeData, d => d.children);
+  mapRoot.x0 = 40; mapRoot.y0 = 0;
+  mapUpdate(mapRoot);
+  setTimeout(resetMapView, 60);
+}
+
+function mapUpdate(source) {
+  const duration = 350;
+  const m = activeMember(); if (!m) return;
+
+  const range = computeWeekRange(m);
+  const minBandWidth = 220, topMargin = 48, leftMargin = 190;
+  const colInset = 16, cellPadL = 16, cellPadR = 14, colRightMargin = 14, subGap = 8, subPadL = 8, subPadR = 7;
+  const lineHeight = 13, cellPadY = 9, minCellHeight = 26, rowGap = 18;
+  const totalCols = range.maxIdx - range.minIdx + 1;
+
+  // The hierarchy's actual root is an invisible '__super__' wrapper (so several project
+  // roots can coexist under one d3.hierarchy) — filter it out of what actually renders.
+  const nodes = mapRoot.descendants().filter(d => d.data.type !== 'super');
+  const links = mapRoot.links().filter(l => l.source.data.type !== 'super');
+
+  // Pass 1 — each week column is wide enough for its header; topics no longer force the
+  // column wider — long text wraps onto extra lines (and the cell grows taller) instead.
+  const colWidths = [];
+  for (let c = 0; c < totalCols; c++) {
+    const idx = range.minIdx + c;
+    const { weekStart: hdrStart, weekEnd: hdrEnd } = weekIndexToDates(range.year, idx);
+    const headerW = Math.max(
+      measureTextWidth(`Week ${idx + 1}`, "800 11px 'Segoe UI', system-ui, sans-serif"),
+      measureTextWidth(formatWeekRange(hdrStart, hdrEnd), "9.5px 'Segoe UI', system-ui, sans-serif")
+    );
+    colWidths[c] = Math.max(minBandWidth, headerW + 30);
+  }
+  const colX = [];
+  { let acc = leftMargin; for (let c = 0; c < totalCols; c++) { colX[c] = acc; acc += colWidths[c]; } }
+
+  // Pass 2 — horizontal position is always locked to the real calendar week the entry's
+  // date falls in (never manual). Vertical position: a freshly-added child prefers to line
+  // up with its parent's own row (rather than starting back at the top of its column), a
+  // manually-dragged cell keeps the exact row it was dropped on, and anything else just
+  // stacks below whatever else has already claimed that column so nothing overlaps.
+  const colY = []; for (let c = 0; c < totalCols; c++) colY[c] = topMargin;
+  // Sub Node cells are a third-width and cascade three-to-a-week: the first one in a column
+  // is left-aligned, the second center-aligned, the third right-aligned, the fourth wraps
+  // back to left, and so on — each new one also hangs a little lower than the one before it,
+  // like a string of lanterns, so three real non-overlapping slots plus a vertical stagger
+  // keep both the cells and the connection lines reaching them from ever coinciding.
+  const colSubCascade = {};
+  const cascadeStep = 18;
+  nodes.forEach(d => {
+    if (d.data.type === 'root') return;
+    const wk = weekOfYear(d.data.date);
+    const idx = Math.min(range.maxIdx, Math.max(range.minIdx, wk.weekIndex));
+    const col = idx - range.minIdx;
+    const fullWidth = colWidths[col] - colInset - colRightMargin;
+    const ref = d.data.nodeRef;
+    const isSub = ref && ref.kind === 'sub';
+
+    if (isSub) {
+      const subWidth = (fullWidth - subGap * 2) / 3;
+      const lines = wrapText(d.data.name, subWidth - subPadL - subPadR, TOPIC_FONT);
+      const cellHeight = Math.max(minCellHeight, lines.length * lineHeight + cellPadY);
+      d.cellWidth = subWidth; d.cellHeight = cellHeight; d.lines = lines;
+
+      if (ref.manualY != null) {
+        const priorCasc = colSubCascade[col];
+        colSubCascade[col] = null;
+        // Keep whichever slot this cell already occupied before it was dragged — a
+        // vertical-only drag shouldn't silently collapse every dragged Sub Node back onto
+        // the left slot and re-stack their lines on top of each other. A record dragged
+        // before that slot was tracked has no remembered x — rather than hard-defaulting
+        // those to the left slot (which looks like every one of them "broke"), continue
+        // the cascade from whatever came right before it in this column.
+        let fallbackX;
+        if (ref.manualX != null) fallbackX = ref.manualX;
+        else if (priorCasc) fallbackX = colX[col] + colInset + ((priorCasc.slot + 1) % 3) * (subWidth + subGap);
+        else fallbackX = colX[col] + colInset;
+        d.y = fallbackX;
+        d.x = ref.manualY;
+        colY[col] = Math.max(colY[col], ref.manualY + cellHeight / 2 + rowGap);
+        return;
+      }
+      const casc = colSubCascade[col];
+      let slot, top;
+      if (casc) {
+        slot = (casc.slot + 1) % 3;
+        top = casc.y + cascadeStep;
+      } else {
+        slot = 0;
+        const parent = d.parent;
+        const preferredTop = (parent && parent.data.type === 'topic') ? (parent.x - cellHeight / 2) : colY[col];
+        top = Math.max(colY[col], preferredTop);
+      }
+      d.y = colX[col] + colInset + slot * (subWidth + subGap);
+      d.x = top + cellHeight / 2;
+      colSubCascade[col] = { slot, y: top };
+      colY[col] = Math.max(colY[col], top + cellHeight + rowGap);
+      return;
+    }
+
+    colSubCascade[col] = null; // a full-width cell breaks the cascade
+    const lines = wrapText(d.data.name, fullWidth - cellPadL - cellPadR, TOPIC_FONT);
+    const cellHeight = Math.max(minCellHeight, lines.length * lineHeight + cellPadY);
+    d.y = colX[col] + colInset;
+    let top;
+    if (ref && ref.manualY != null) {
+      top = ref.manualY - cellHeight / 2;
+    } else {
+      const parent = d.parent;
+      const preferredTop = (parent && parent.data.type === 'topic') ? (parent.x - cellHeight / 2) : colY[col];
+      top = Math.max(colY[col], preferredTop);
+    }
+    d.x = top + cellHeight / 2;
+    d.cellWidth = fullWidth;
+    d.cellHeight = cellHeight;
+    d.lines = lines;
+    colY[col] = Math.max(colY[col], top + cellHeight + rowGap);
+  });
+  obstacleCache = nodes.filter(d => d.data.type === 'topic').map(d => ({
+    id: d.data.nodeRef.id, x: d.y, y: d.x - d.cellHeight / 2, w: d.cellWidth, h: d.cellHeight
+  }));
+  const maxColBottom = Math.max(topMargin, ...colY);
+  // Each project gets its own root circle, vertically centered on the span of its own
+  // topics (an empty project falls back to a stacked default slot near the top).
+  const projectRootNodes = nodes.filter(d => d.data.type === 'root');
+  let emptyProjectSlot = 0;
+  projectRootNodes.forEach(pr => {
+    const topicXs = pr.descendants().filter(d => d.data.type === 'topic').map(d => d.x);
+    pr.y = 150;
+    if (topicXs.length) pr.x = (Math.min(...topicXs) + Math.max(...topicXs)) / 2;
+    else { pr.x = topMargin + 20 + emptyProjectSlot * 56; emptyProjectSlot++; }
+  });
+  // Two projects can independently land on the same natural center (e.g. each has just
+  // one topic in its own first row) — declutter so root circles never touch.
+  const minRootGap = 96;
+  projectRootNodes.slice().sort((a, b) => a.x - b.x).forEach((pr, i, arr) => {
+    if (i > 0 && pr.x < arr[i - 1].x + minRootGap) pr.x = arr[i - 1].x + minRootGap;
+  });
+
+  const plotHeight = Math.max(mapSvgSel.node().clientHeight || 0, maxColBottom + 30);
+
+  mapNodePositions = {};
+  nodes.forEach(d => { mapNodePositions[d.data.id] = nodePos(d); });
+
+  // week background bands (variable width, sized in pass 1)
+  const bandsLayer = mapInner.select('.bands-layer');
+  bandsLayer.selectAll('*').remove();
+  for (let c = 0; c < totalCols; c++) {
+    const idx = range.minIdx + c;
+    const { weekStart: wStart, weekEnd: wEnd } = weekIndexToDates(range.year, idx);
+    const bx = colX[c], bw = colWidths[c];
+    const band = WEEK_BAND_COLORS[c % WEEK_BAND_COLORS.length];
+    bandsLayer.append('rect')
+      .attr('x', bx).attr('y', 0).attr('width', bw).attr('height', plotHeight)
+      .attr('fill', band.fill)
+      .attr('stroke', band.border).attr('stroke-width', 1.5);
+    bandsLayer.append('rect')
+      .attr('x', bx).attr('y', 0).attr('width', bw).attr('height', 40)
+      .attr('fill', band.header);
+    bandsLayer.append('line')
+      .attr('x1', bx).attr('x2', bx + bw).attr('y1', 40).attr('y2', 40)
+      .attr('stroke', band.border).attr('stroke-opacity', 0.55).attr('stroke-width', 1);
+    bandsLayer.append('text').attr('x', bx + bw / 2).attr('y', 23).attr('text-anchor', 'middle')
+      .attr('font-size', '13.5').attr('font-weight', '800').attr('fill', '#1e293b')
+      .text(`Week ${idx + 1}`);
+    bandsLayer.append('text').attr('x', bx + bw / 2).attr('y', 36).attr('text-anchor', 'middle')
+      .attr('font-size', '9.5').attr('fill', 'rgba(30,41,59,.55)')
+      .text(formatWeekRange(wStart, wEnd));
+  }
+
+  // A strict 2-segment elbow only has 2 possible directions, so once 3+ lines share the exact
+  // same endpoint (root with many topics, a topic with several sub-topics, or several
+  // connections meeting at one topic) some would necessarily retrace each other — fan every
+  // node's touching lines out with a small symmetric offset so they leave/arrive separated.
+  const fanTotal = {}, fanUsed = {};
+  const bump = id => { fanTotal[id] = (fanTotal[id] || 0) + 1; };
+  links.forEach(l => { bump(l.source.data.id); bump(l.target.data.id); });
+  (m.connections || []).forEach(c => { bump(c.a); bump(c.b); });
+  function fanned(pos, id) {
+    const total = fanTotal[id] || 1;
+    if (total <= 1) return pos;
+    const idx = (fanUsed[id] = (fanUsed[id] || 0) + 1) - 1;
+    const offset = (idx - (total - 1) / 2) * 9;
+    // Nudging only the vertical component only actually separates lines that leave from a
+    // left/right edge — for lines whose nearest edge turns out to be top/bottom (e.g. a
+    // parent and its Sub Nodes sitting in the very same week), that edge's anchor x is
+    // pos.x + w/2, so it needs the horizontal nudge too or every line still leaves from the
+    // same point. Shifting both keeps whichever edge ends up chosen properly fanned out.
+    return { ...pos, x: pos.x + offset, y: pos.y + offset };
+  }
+
+  // tree edges (topic -> sub-topic "trail") — smooth curves between the cells' centers, with
+  // an arrowhead at the MIDPOINT of the curve (not one end) showing the parent -> child
+  // direction of flow. Style/color are per-child (stored on the child topic, since each
+  // child has exactly one incoming trail line) and are editable by clicking the line itself.
+  const link = mapInner.selectAll('.tree-link').data(links, d => d.target.data.id);
+  const linkEnter = link.enter().insert('path', '.map-node')
+    .attr('class', 'tree-link').attr('fill', 'none').attr('stroke-width', THREAD_WIDTH).attr('stroke-opacity', 0.8)
+    .style('cursor', 'pointer').style('pointer-events', 'stroke')
+    .attr('d', () => { const o = { x: source.y0 || 0, y: source.x0 || 0, w: 0 }; return curvePath(o, o); })
+    .style('opacity', 0)
+    .on('click', (event, d) => openThreadMenu(event, { type: 'tree', id: d.target.data.nodeRef.id }));
+  linkEnter.append('title').text('Click the line to change its color or style');
+  const linkMerged = link.merge(linkEnter);
+  // fanned() advances a shared counter each time it's called for a given id, so it must be
+  // called exactly ONCE per link and the result reused for both the line and its arrow —
+  // calling it twice (once per element) handed each a different fan offset and made the
+  // arrow drift away from the line it belonged to.
+  const linkPos = new Map();
+  links.forEach(d => linkPos.set(d.target.data.id, {
+    sp: fanned(nodePos(d.source), d.source.data.id),
+    tp: fanned(nodePos(d.target), d.target.data.id)
+  }));
+  linkMerged.transition().duration(duration).style('opacity', 1)
+    .attr('d', d => { const p = linkPos.get(d.target.data.id); return curvePath(p.sp, p.tp); });
+  linkMerged.attr('stroke', d => (d.target.data.nodeRef && d.target.data.nodeRef.linkColor) || DEFAULT_TREE_COLOR)
+    .attr('stroke-dasharray', d => (d.target.data.nodeRef && d.target.data.nodeRef.linkStyle) === 'dashed' ? '6,4' : null)
+    .attr('stroke-width', d => (threadTarget && threadTarget.type === 'tree' && d.target.data.nodeRef && threadTarget.id === d.target.data.nodeRef.id) ? THREAD_WIDTH + 1.5 : THREAD_WIDTH);
+  link.exit().transition().duration(duration)
+    .attr('d', () => { const o = { x: source.y, y: source.x, w: 0 }; return curvePath(o, o); }).style('opacity', 0).remove();
+
+  const treeArrow = mapInner.selectAll('.tree-arrow').data(links, d => d.target.data.id);
+  const treeArrowEnter = treeArrow.enter().append('path').attr('class', 'tree-arrow')
+    .attr('d', ARROW_SHAPE).style('opacity', 0).style('pointer-events', 'none');
+  treeArrow.merge(treeArrowEnter).transition().duration(duration).style('opacity', 1)
+    .attr('fill', d => (d.target.data.nodeRef && d.target.data.nodeRef.linkColor) || DEFAULT_TREE_COLOR)
+    .attr('transform', d => {
+      const p = linkPos.get(d.target.data.id);
+      const a = curveMidArrow(p.sp, p.tp);
+      return `translate(${a.x},${a.y}) rotate(${a.angle})`;
+    });
+  treeArrow.exit().remove();
+
+  // Selecting a tree-link (clicking it) reveals a drag handle at each end — grab either one
+  // and drop it on a different node (or the project root) to move this whole branch there.
+  mapInner.selectAll('.tree-handle').remove();
+  if (threadTarget && threadTarget.type === 'tree') {
+    const selLink = links.find(l => l.target.data.nodeRef && l.target.data.nodeRef.id === threadTarget.id);
+    if (selLink) {
+      const posP = fanned(nodePos(selLink.source), selLink.source.data.id);
+      const posC = fanned(nodePos(selLink.target), selLink.target.data.id);
+      [{ pos: edgeAnchor(posP, posC), key: 'parent' }, { pos: edgeAnchor(posC, posP), key: 'child' }].forEach(h => {
+        mapInner.append('circle').attr('class', 'tree-handle')
+          .attr('cx', h.pos.x).attr('cy', h.pos.y).attr('r', 6)
+          .attr('fill', DEFAULT_TREE_COLOR).attr('stroke', '#fff').attr('stroke-width', 1.5).style('cursor', 'grab')
+          .call(treeEndpointDrag(threadTarget.id, h.key))
+          .append('title').text('Drag onto another node (or the project circle) to move this branch there');
+      });
+    }
+  }
+
+  // cross-topic connection overlay (re-pluggable) — same curved routing, with a direction
+  // arrow sitting at the curve's midpoint; clicking the line opens the same color/style
+  // editor, and reveals its own end-handles (only the selected connection's are shown).
+  mapInner.selectAll('.conn-link, .conn-handle, .conn-arrow').remove();
+  (m.connections || []).forEach(conn => {
+    const pa = mapNodePositions[conn.a], pb = mapNodePositions[conn.b];
+    if (!pa || !pb) return;
+    const col = conn.color || DEFAULT_CONN_COLOR;
+    const selected = threadTarget && threadTarget.type === 'conn' && threadTarget.id === conn.id;
+    const fa = fanned(pa, conn.a), fb = fanned(pb, conn.b);
+    const cornerA = edgeAnchor(fa, fb), cornerB = edgeAnchor(fb, fa);
+    mapInner.insert('path', '.map-node').attr('class', 'conn-link').attr('data-conn', conn.id)
+      .attr('fill', 'none').attr('stroke', col).attr('stroke-opacity', 0.85).attr('stroke-width', selected ? THREAD_WIDTH + 1.5 : THREAD_WIDTH)
+      .attr('stroke-dasharray', (conn.style || 'dashed') === 'dashed' ? '6,4' : null)
+      .style('cursor', 'pointer').style('pointer-events', 'stroke')
+      .attr('d', curvePath(fa, fb))
+      .on('click', (event) => openThreadMenu(event, { type: 'conn', id: conn.id }))
+      .append('title').text('Click the line to change its color, style, or remove it · drag an endpoint dot to re-plug it');
+    const midArrow = curveMidArrow(fa, fb);
+    mapInner.insert('path', '.map-node').attr('class', 'conn-arrow').attr('data-conn', conn.id)
+      .attr('d', ARROW_SHAPE).attr('fill', col).style('pointer-events', 'none')
+      .attr('transform', `translate(${midArrow.x},${midArrow.y}) rotate(${midArrow.angle})`);
+    if (!selected) return;
+
+    mapInner.append('circle').attr('class', 'conn-handle').attr('data-conn', conn.id).attr('data-end', 'a')
+      .attr('cx', cornerA.x).attr('cy', cornerA.y).attr('r', 6)
+      .attr('fill', col).attr('stroke', '#fff').attr('stroke-width', 1.5).style('cursor', 'grab')
+      .call(connEndpointDrag(conn.id, 'a'));
+    mapInner.append('circle').attr('class', 'conn-handle').attr('data-conn', conn.id).attr('data-end', 'b')
+      .attr('cx', cornerB.x).attr('cy', cornerB.y).attr('r', 6)
+      .attr('fill', col).attr('stroke', '#fff').attr('stroke-width', 1.5).style('cursor', 'grab')
+      .call(connEndpointDrag(conn.id, 'b'));
+  });
+
+  // nodes
+  const node = mapInner.selectAll('.map-node').data(nodes, d => d.id || (d.id = ++mapNodeId));
+  const nodeEnter = node.enter().append('g').attr('class', 'map-node')
+    .attr('transform', () => `translate(${source.y0 || 0},${source.x0 || 0})`)
+    .style('opacity', 0).style('cursor', 'pointer')
+    .on('click', (e, d) => { e.stopPropagation(); onNodeClick(d); });
+
+  const rE = nodeEnter.filter(d => d.data.type === 'root');
+  rE.append('circle').attr('class', 'anchor-ring').attr('r', 26).attr('fill', 'none').attr('stroke', '#fbbf24').attr('stroke-width', 2).attr('stroke-opacity', 0);
+  rE.append('text').attr('class', 'root-emoji').attr('text-anchor', 'middle').attr('dy', '0.38em')
+    .attr('font-size', ROOT_EMOJI_SIZE).style('pointer-events', 'none').style('user-select', 'none').text('🙂');
+  rE.each(function (d) {
+    const g = d3.select(this);
+    const lines = wrapText(d.data.name, ROOT_LABEL_MAX_WIDTH, ROOT_LABEL_FONT);
+    const text = g.append('text').attr('class', 'editable-label').attr('text-anchor', 'end')
+      .attr('font-size', '15').attr('font-weight', '800').attr('fill', '#1e293b').style('cursor', 'text')
+      .on('click', function (event) { editNodeName(event, d, g); });
+    lines.forEach((line, i) => {
+      const y = -((lines.length - 1) * 15) / 2 + i * 15;
+      text.append('tspan').attr('x', ROOT_LABEL_X).attr('y', y).attr('dy', '0.32em').text(line);
+    });
+    g.append('text').attr('text-anchor', 'middle').attr('x', 0).attr('y', ROOT_EMOJI_SIZE / 2 + 16)
+      .attr('font-size', '10').attr('fill', 'rgba(30,41,59,.55)').text(`${d.data.count} topic${d.data.count !== 1 ? 's' : ''}`);
+  });
+
+  // Topics render as spreadsheet-style cells, same width as every other cell in their
+  // column but each as tall as its own (fully unwrapped, never-truncated) text needs.
+  const tE = nodeEnter.filter(d => d.data.type === 'topic')
+    .on('mouseenter', (event, d) => showHoverCard(d))
+    .on('mouseleave', () => scheduleHideHoverCard());
+  tE.append('rect').attr('class', 'anchor-ring').attr('rx', 6).attr('fill', 'none').attr('stroke', '#fbbf24').attr('stroke-width', 2).attr('stroke-opacity', 0)
+    .attr('x', -3).attr('y', d => -d.cellHeight / 2 - 3).attr('width', d => d.cellWidth + 6).attr('height', d => d.cellHeight + 6);
+  tE.append('path').attr('class', 'topic-box')
+    .attr('d', d => cellShapePath(nodeKind(d), d.cellWidth, d.cellHeight))
+    .attr('fill', d => KIND_COLORS[nodeKind(d)].fill)
+    .attr('stroke', d => KIND_COLORS[nodeKind(d)].stroke).attr('stroke-width', 1.5);
+  tE.append('text').attr('class', 'editable-label').attr('font-size', '11').attr('font-weight', '700')
+    .attr('fill', d => KIND_COLORS[nodeKind(d)].text).style('cursor', 'text')
+    .on('click', function (event, d) { editNodeName(event, d, d3.select(this.parentNode)); });
+  // A 2x3 grid of dots (bigger and more numerous than a single glyph) plus a generous
+  // invisible hit-area behind them, so the grab handle is easy to spot and easy to land on.
+  const dragHandle = tE.append('g').attr('class', 'drag-handle').style('cursor', 'ns-resize').call(topicDragBehavior())
+    .on('dblclick', function (event, d) {
+      event.stopPropagation();
+      const ref = d.data.nodeRef; if (!ref) return;
+      delete ref.manualY; delete ref.manualX;
+      save(); buildD3Map();
+    });
+  dragHandle.append('rect').attr('class', 'drag-handle-hit')
+    .attr('x', -11).attr('y', d => -Math.max(d.cellHeight, 26) / 2).attr('width', 18).attr('height', d => Math.max(d.cellHeight, 26))
+    .attr('fill', 'transparent');
+  dragHandle.append('text').attr('class', 'drag-handle-arrow').attr('x', -3).attr('y', -9)
+    .attr('text-anchor', 'middle').attr('font-size', 8).attr('fill', '#1e293b')
+    .style('pointer-events', 'none').style('user-select', 'none').text('▲');
+  dragHandle.append('text').attr('class', 'drag-handle-face').attr('x', -3).attr('y', 4)
+    .attr('text-anchor', 'middle').attr('font-size', 12)
+    .style('pointer-events', 'none').style('user-select', 'none').text('🙂');
+  dragHandle.append('text').attr('class', 'drag-handle-arrow').attr('x', -3).attr('y', 14)
+    .attr('text-anchor', 'middle').attr('font-size', 8).attr('fill', '#1e293b')
+    .style('pointer-events', 'none').style('user-select', 'none').text('▼');
+  dragHandle.append('title').text("Drag up/down to reposition within this cell's week · double-click to reset to automatic placement");
+  tE.append('circle').attr('class', 'has-content-dot').attr('r', 3.5).attr('fill', '#4f46e5').attr('stroke', '#fff').attr('stroke-width', 1).style('display', 'none');
+  tE.append('foreignObject').attr('class', 'desc-card').attr('width', 220).attr('height', 190).attr('y', -20).style('display', 'none')
+    .on('mouseenter', () => cancelHideHoverCard())
+    .on('mouseleave', () => scheduleHideHoverCard());
+
+  const nodeMerged = node.merge(nodeEnter);
+  nodeMerged.transition().duration(duration).style('opacity', 1).attr('transform', d => `translate(${d.y},${d.x})`);
+  nodeMerged.select('.anchor-ring').attr('stroke-opacity', d => isAnchor(d, m) ? 0.9 : 0);
+  nodeMerged.filter(d => d.data.type === 'topic').each(function (d) {
+    const g = d3.select(this);
+    const n = d.data.nodeRef;
+    const lines = d.lines || [n.text];
+    const textSel = g.select('.editable-label');
+    textSel.selectAll('tspan').remove();
+    const padL = nodeKind(d) === 'sub' ? subPadL : cellPadL;
+    lines.forEach((line, i) => {
+      const y = -((lines.length - 1) * lineHeight) / 2 + i * lineHeight;
+      textSel.append('tspan').attr('x', padL).attr('y', y).attr('dy', '0.35em').text(line);
+    });
+    // Sits right on the cell's top-right corner (not inset into it) so it never lands in the
+    // same few pixels text wraps into — the 'sub' shape's own right padding (subPadR) is only
+    // 7px, exactly where the old inset placed this dot, so it clipped the last glyph of the
+    // top line.
+    g.select('.has-content-dot').attr('cx', d.cellWidth).attr('cy', -d.cellHeight / 2)
+      .style('display', hasBulletContent(n) ? 'block' : 'none');
+    g.select('.desc-card').attr('x', d.cellWidth + 10);
+  });
+  node.exit().transition().duration(duration).style('opacity', 0)
+    .attr('transform', () => `translate(${source.y},${source.x})`).remove();
+
+  // Handles are drawn before the cells themselves, so without this a cell could still paint
+  // over a neighboring handle — bring whichever handles exist back to the very front.
+  mapInner.selectAll('.tree-handle, .conn-handle').raise();
+
+  nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
+}
+function nodePos(d) {
+  return {
+    x: d.y, y: d.x,
+    w: d.data.type === 'topic' ? (d.cellWidth || 0) : 0,
+    h: d.data.type === 'topic' ? (d.cellHeight || 0) : 0,
+    id: d.data.nodeRef ? d.data.nodeRef.id : null
+  };
+}
+// A thread anchors at the center of whichever edge (left/right/top/bottom) of the cell
+// faces the OTHER end of that thread, touching the cell's actual boundary exactly (no gap).
+// Handles stay grabbable despite sitting right on that edge because they're always raised
+// to the front of the drawing order, regardless of what cell geometry is under them.
+// Point-like positions (root circles, or a connection end mid-drag under the cursor) have
+// no width, so they pass through unchanged.
+function edgeAnchor(pos, other) {
+  if (!pos.w) return { x: pos.x, y: pos.y };
+  const towardX = other.x + (other.w || 0) / 2, towardY = other.y;
+  const w = pos.w, h = pos.h || 0, cx = pos.x + w / 2;
+  const edges = [
+    { x: pos.x, y: pos.y },
+    { x: pos.x + w, y: pos.y },
+    { x: cx, y: pos.y - h / 2 },
+    { x: cx, y: pos.y + h / 2 }
+  ];
+  let best = edges[0], bestDist = Infinity;
+  edges.forEach(e => {
+    const dist = Math.hypot(e.x - towardX, e.y - towardY);
+    if (dist < bestDist) { bestDist = dist; best = e; }
+  });
+  return best;
+}
+function nodeKind(d) { return (d.data.nodeRef && d.data.nodeRef.kind) || 'sub'; }
+// The project root marker — a big emoji (in place of the old star/circle) with the
+// project's own name wrapped underneath it, rather than squeezed inside a shape.
+const ROOT_EMOJI_SIZE = 40;
+const ROOT_LABEL_MAX_WIDTH = 100;
+const ROOT_LABEL_X = -(ROOT_EMOJI_SIZE / 2 + 8);
+const ROOT_LABEL_FONT = "800 15px 'Segoe UI', system-ui, sans-serif";
+function roundedRectPath(x, y, w, h, r) {
+  r = Math.max(0, Math.min(r, w / 2, h / 2));
+  return `M${x + r},${y} H${x + w - r} A${r},${r} 0 0 1 ${x + w},${y + r} V${y + h - r} A${r},${r} 0 0 1 ${x + w - r},${y + h} H${x + r} A${r},${r} 0 0 1 ${x},${y + h - r} V${y + r} A${r},${r} 0 0 1 ${x + r},${y} Z`;
+}
+// Each cell's outline exactly mirrors its add-button: 'node' = a paper-tape/ribbon strip
+// (a V notch cut into each end, like a ticket or banner tail), 'sub' = a squared octagon
+// (small, subtle corner cuts — reads as "square" more than "stop-sign"), 'subsub' = a
+// parallelogram — shapes that are all clearly non-rectangular, so the three depths stay
+// visually distinct at a glance.
+function cellShapePath(kind, w, h) {
+  const y0 = -h / 2, y1 = h / 2;
+  if (kind === 'node') {
+    const notch = Math.min(h * 0.32, w * 0.12, 12);
+    return `M0,${y0} L${w},${y0} L${w - notch},0 L${w},${y1} L0,${y1} L${notch},0 Z`;
+  }
+  if (kind === 'subsub') {
+    const skew = Math.min(w * 0.18, 13);
+    return `M${skew},${y0} L${w},${y0} L${w - skew},${y1} L0,${y1} Z`;
+  }
+  const cut = Math.min(w * 0.13, h * 0.3, 7);
+  return `M${cut},${y0} L${w - cut},${y0} L${w},${y0 + cut} L${w},${y1 - cut} L${w - cut},${y1} L${cut},${y1} L0,${y1 - cut} L0,${y0 + cut} Z`;
+}
+function bezierPointAt(p0, p1, p2, p3, t) {
+  const mt = 1 - t;
+  return {
+    x: mt * mt * mt * p0.x + 3 * mt * mt * t * p1.x + 3 * mt * t * t * p2.x + t * t * t * p3.x,
+    y: mt * mt * mt * p0.y + 3 * mt * mt * t * p1.y + 3 * mt * t * t * p2.y + t * t * t * p3.y
+  };
+}
+// Samples a candidate curve and counts how many points land inside an unrelated cell.
+function countCurveHits(p0, p1, p2, p3, excludeIds) {
+  if (!obstacleCache.length) return 0;
+  let hits = 0;
+  for (let i = 1; i < 10; i++) {
+    const pt = bezierPointAt(p0, p1, p2, p3, i / 10);
+    for (const o of obstacleCache) {
+      if (excludeIds.has(o.id)) continue;
+      if (pt.x >= o.x && pt.x <= o.x + o.w && pt.y >= o.y && pt.y <= o.y + o.h) hits++;
+    }
+  }
+  return hits;
+}
+// Bulge offsets tried (in px) when routing a curve — 0 first, so a clean unobstructed
+// connection always keeps the plain, minimal S-curve rather than bowing for no reason.
+const CURVE_BENDS = [0, 26, -26, 52, -52, 78, -78, 104, -104];
+// Smooth curve between the two cells' nearest-facing edge centers — tries a handful of
+// bulge amounts and keeps whichever crosses the fewest unrelated cells on the way, so
+// threads have a natural tendency to route around nodes instead of through them.
+function curveControlPoints(posA, posB) {
+  const p0 = edgeAnchor(posA, posB), p3 = edgeAnchor(posB, posA);
+  const midX = p0.x + (p3.x - p0.x) / 2;
+  const excludeIds = new Set([posA.id, posB.id].filter(Boolean));
+  let best = null, bestScore = Infinity;
+  for (const bend of CURVE_BENDS) {
+    const p1 = { x: midX, y: p0.y + bend }, p2 = { x: midX, y: p3.y + bend };
+    const score = countCurveHits(p0, p1, p2, p3, excludeIds);
+    if (score < bestScore) { bestScore = score; best = { p0, p1, p2, p3 }; }
+    if (bestScore === 0) break;
+  }
+  return best;
+}
+function curvePath(posA, posB) {
+  const { p0, p1, p2, p3 } = curveControlPoints(posA, posB);
+  return `M${p0.x},${p0.y} C${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}`;
+}
+// Point + tangent angle at the curve's exact midpoint, so the direction arrow can sit there
+// instead of at one end.
+function curveMidArrow(posA, posB) {
+  const { p0, p1, p2, p3 } = curveControlPoints(posA, posB);
+  const t = 0.5, mt = 0.5;
+  const x = mt * mt * mt * p0.x + 3 * mt * mt * t * p1.x + 3 * mt * t * t * p2.x + t * t * t * p3.x;
+  const y = mt * mt * mt * p0.y + 3 * mt * mt * t * p1.y + 3 * mt * t * t * p2.y + t * t * t * p3.y;
+  const dx = 3 * mt * mt * (p1.x - p0.x) + 6 * mt * t * (p2.x - p1.x) + 3 * t * t * (p3.x - p2.x);
+  const dy = 3 * mt * mt * (p1.y - p0.y) + 6 * mt * t * (p2.y - p1.y) + 3 * t * t * (p3.y - p2.y);
+  const angle = (dx || dy) ? Math.atan2(dy, dx) * 180 / Math.PI : 0;
+  return { x, y, angle };
+}
+// Greedy word-wrap so topic text is always fully visible (never truncated) — the cell grows
+// taller instead of clipping.
+function wrapText(text, maxWidth, font) {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  if (!words.length) return [''];
+  const lines = [];
+  let current = words[0];
+  for (let i = 1; i < words.length; i++) {
+    const test = current + ' ' + words[i];
+    if (measureTextWidth(test, font) > maxWidth) { lines.push(current); current = words[i]; }
+    else current = test;
+  }
+  lines.push(current);
+  return lines;
+}
+
+// ── DRAG A CELL VERTICALLY WITHIN ITS OWN WEEK COLUMN ─────────────────────
+// Only ever adjusts the cell's row (d.x) — its column (d.y) is derived from its date and
+// is never touched here, so the entry can never leave its own week.
+function topicDragBehavior() {
+  let curX;
+  return d3.drag()
+    .on('start', function (event, d) {
+      event.sourceEvent.stopPropagation();
+      curX = d.x;
+    })
+    .on('drag', function (event, d) {
+      curX += event.dy;
+      d.x = curX;
+      d3.select(this.parentNode).attr('transform', `translate(${d.y},${curX})`);
+      const id = d.data.nodeRef.id;
+      const pos = mapNodePositions[id];
+      if (pos) pos.y = curX;
+      mapInner.selectAll('.tree-link').filter(l => l.source === d || l.target === d)
+        .attr('d', l => curvePath(nodePos(l.source), nodePos(l.target)));
+      mapInner.selectAll('.tree-arrow').filter(l => l.source === d || l.target === d)
+        .attr('transform', l => { const a = curveMidArrow(nodePos(l.source), nodePos(l.target)); return `translate(${a.x},${a.y}) rotate(${a.angle})`; });
+      if (threadTarget && threadTarget.type === 'tree' && threadTarget.id === id) {
+        const selLink = mapRoot.links().find(l => l.target.data.nodeRef && l.target.data.nodeRef.id === id);
+        if (selLink) {
+          const posP = nodePos(selLink.source), posC = nodePos(selLink.target);
+          const corners = [edgeAnchor(posP, posC), edgeAnchor(posC, posP)];
+          mapInner.selectAll('.tree-handle').each(function (_, i) { d3.select(this).attr('cx', corners[i].x).attr('cy', corners[i].y); });
+        }
+      }
+      const m = activeMember();
+      (m.connections || []).forEach(conn => {
+        if (conn.a !== id && conn.b !== id) return;
+        const pa = mapNodePositions[conn.a], pb = mapNodePositions[conn.b];
+        if (!pa || !pb) return;
+        mapInner.select(`.conn-link[data-conn="${conn.id}"]`).attr('d', curvePath(pa, pb));
+        const cornerA = edgeAnchor(pa, pb), cornerB = edgeAnchor(pb, pa);
+        mapInner.select(`.conn-handle[data-conn="${conn.id}"][data-end="a"]`).attr('cx', cornerA.x).attr('cy', cornerA.y);
+        mapInner.select(`.conn-handle[data-conn="${conn.id}"][data-end="b"]`).attr('cx', cornerB.x).attr('cy', cornerB.y);
+        const midArrow = curveMidArrow(pa, pb);
+        mapInner.select(`.conn-arrow[data-conn="${conn.id}"]`).attr('transform', `translate(${midArrow.x},${midArrow.y}) rotate(${midArrow.angle})`);
+      });
+    })
+    .on('end', function (event, d) {
+      d.data.nodeRef.manualY = curX;
+      d.data.nodeRef.manualX = d.y; // preserve its current left/right slot — this drag only ever moved it vertically
+      save();
+      buildD3Map();
+    });
+}
+
+// ── RE-PLUG CONNECTIONS (entries themselves stay fixed to their week column) ──
+// A drop counts as landing on a topic if the point falls anywhere inside that cell's actual
+// rectangle (not just near its corner) — otherwise dropping in the middle of a wide cell would
+// miss. Root circles are matched by simple proximity to their center. Falls back to nearest-
+// by-distance within maxDist for near-misses just outside a cell's edge.
+function hitTestMapNode(svgX, svgY, opts) {
+  if (!mapRoot) return null;
+  const includeRoot = opts && opts.includeRoot;
+  const maxDist = (opts && opts.maxDist) || 26;
+  let best = null, bestDist = maxDist;
+  mapRoot.descendants().forEach(d => {
+    if (d.data.type === 'topic') {
+      const w = d.cellWidth || 0, h = d.cellHeight || 0;
+      if (svgX >= d.y && svgX <= d.y + w && svgY >= d.x - h / 2 && svgY <= d.x + h / 2) { best = d; bestDist = -1; return; }
+      if (bestDist < 0) return;
+      const cx = d.y + w / 2, cy = d.x;
+      const dist = Math.hypot(cx - svgX, cy - svgY);
+      if (dist < bestDist) { bestDist = dist; best = d; }
+    } else if (includeRoot && d.data.type === 'root') {
+      if (bestDist < 0) return;
+      const dist = Math.hypot(d.y - svgX, d.x - svgY);
+      if (dist < bestDist) { bestDist = dist; best = d; }
+    }
+  });
+  return best;
+}
+function findNearestTopicNode(svgX, svgY, maxDist) { return hitTestMapNode(svgX, svgY, { maxDist }); }
+function findNearestTopicOrRootNode(svgX, svgY, maxDist) { return hitTestMapNode(svgX, svgY, { maxDist, includeRoot: true }); }
+// Moves a topic (and its whole existing subtree) to be a child of a different node, or back
+// to being a fresh top-level entry under a project (newParentId null). Refuses to move a
+// branch onto itself or one of its own descendants, which would create a cycle.
+function reparentNode(childId, newParentId, newProjectId) {
+  const m = activeMember(); if (!m) return;
+  if (newParentId === childId) return;
+  const child = findNode(m, childId); if (!child) return;
+  if (newParentId && new Set(collectIds(child)).has(newParentId)) return;
+  const arr = findParentArray(m, childId); if (!arr) return;
+  const idx = arr.findIndex(n => n.id === childId); if (idx === -1) return;
+  arr.splice(idx, 1);
+  delete child.projectId;
+  if (newParentId) {
+    const newParent = findNode(m, newParentId);
+    if (!newParent) { arr.splice(idx, 0, child); return; }
+    newParent.children = newParent.children || [];
+    newParent.children.push(child);
+  } else {
+    child.projectId = newProjectId || m.lastProjectId || (m.projects[0] && m.projects[0].id);
+    m.topics.push(child);
+  }
+  save();
+}
+function treeEndpointDrag(childId, endKey) {
+  let cx, cy;
+  return d3.drag()
+    .on('start', function (event) {
+      event.sourceEvent.stopPropagation();
+      cx = +d3.select(this).attr('cx'); cy = +d3.select(this).attr('cy');
+      d3.select(this).attr('r', 9).raise();
+    })
+    .on('drag', function (event) {
+      cx += event.dx; cy += event.dy;
+      d3.select(this).attr('cx', cx).attr('cy', cy);
+      const selLink = mapRoot.links().find(l => l.target.data.nodeRef && l.target.data.nodeRef.id === childId);
+      if (!selLink) return;
+      const draggedPos = { x: cx, y: cy, w: 0 };
+      const otherPos = endKey === 'parent' ? nodePos(selLink.target) : nodePos(selLink.source);
+      const pa = endKey === 'parent' ? draggedPos : otherPos;
+      const pb = endKey === 'parent' ? otherPos : draggedPos;
+      mapInner.selectAll('.tree-link').filter(l => l.target.data.nodeRef && l.target.data.nodeRef.id === childId)
+        .attr('d', curvePath(pa, pb));
+      const midArrow = curveMidArrow(pa, pb);
+      mapInner.selectAll('.tree-arrow').filter(l => l.target.data.nodeRef && l.target.data.nodeRef.id === childId)
+        .attr('transform', `translate(${midArrow.x},${midArrow.y}) rotate(${midArrow.angle})`);
+    })
+    .on('end', function () {
+      d3.select(this).attr('r', 6);
+      const target = findNearestTopicOrRootNode(cx, cy, 30);
+      if (target) {
+        const newParentId = target.data.type === 'root' ? null : target.data.nodeRef.id;
+        reparentNode(childId, newParentId, target.data.type === 'root' ? target.data.projectId : null);
+      }
+      buildD3Map();
+    });
+}
+function connEndpointDrag(connId, endKey) {
+  // Tracks position via the drag's own relative dx/dy (already in mapInner's local
+  // space, since these handles are direct children of mapInner) rather than
+  // re-deriving absolute coordinates via d3.pointer/getScreenCTM.
+  let cx, cy;
+  return d3.drag()
+    .on('start', function (event) {
+      event.sourceEvent.stopPropagation();
+      cx = +d3.select(this).attr('cx'); cy = +d3.select(this).attr('cy');
+      d3.select(this).attr('r', 9).raise();
+    })
+    .on('drag', function (event) {
+      cx += event.dx; cy += event.dy;
+      d3.select(this).attr('cx', cx).attr('cy', cy);
+      const m = activeMember(); const conn = m && findConnection(m, connId); if (!conn) return;
+      const otherKey = endKey === 'a' ? 'b' : 'a';
+      const otherPos = mapNodePositions[conn[otherKey]];
+      if (!otherPos) return;
+      const draggedPos = { x: cx, y: cy, w: 0 };
+      const pa = endKey === 'a' ? draggedPos : otherPos;
+      const pb = endKey === 'a' ? otherPos : draggedPos;
+      mapInner.select(`.conn-link[data-conn="${connId}"]`).attr('d', curvePath(pa, pb));
+      const midArrow = curveMidArrow(pa, pb);
+      mapInner.select(`.conn-arrow[data-conn="${connId}"]`).attr('transform', `translate(${midArrow.x},${midArrow.y}) rotate(${midArrow.angle})`);
+    })
+    .on('end', function (event) {
+      d3.select(this).attr('r', 6);
+      const m = activeMember(); const conn = m && findConnection(m, connId); if (!conn) return;
+      const target = findNearestTopicNode(cx, cy, 26);
+      const otherId = conn[endKey === 'a' ? 'b' : 'a'];
+      if (target && target.data.nodeRef.id !== otherId) {
+        conn[endKey] = target.data.nodeRef.id;
+        save();
+      }
+      buildD3Map();
+    });
+}
+
+// ── INLINE DESCRIPTION CARD (lives on the node itself) — a bullet-point list ──
+const BULLET_MAX_WORDS = 20;
+function hasBulletContent(n) { return !!(n.bullets && n.bullets.some(b => b && b.trim())); }
+function autoGrowTextarea(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+// Trims to the first `max` words, preserving whatever whitespace/punctuation already
+// separated them rather than collapsing it, so a mid-typing cursor position stays sane.
+function limitWords(str, max) {
+  let count = 0, cut = str.length;
+  const re = /\S+/g;
+  let match;
+  while ((match = re.exec(str))) {
+    count++;
+    if (count === max) cut = match.index + match[0].length;
+    if (count > max) { cut = match.index; break; }
+  }
+  return count > max ? str.slice(0, cut) : str;
+}
+// Applies limitWords to a live text input in place, keeping the caret where it logically
+// belongs instead of letting the reassigned .value snap it to the end of the field —
+// otherwise every capped keystroke visibly kicks the cursor to the far right.
+function applyWordCap(el, max) {
+  const pos = el.selectionStart;
+  const capped = limitWords(el.value, max);
+  if (capped !== el.value) {
+    el.value = capped;
+    const newPos = Math.min(pos, capped.length);
+    el.setSelectionRange(newPos, newPos);
+  }
+}
+function buildDescCardHtml(n) {
+  const bullets = n.bullets || [];
+  const rows = bullets.map((b, i) => `
+      <div class="bullet-row">
+        <span class="bullet-mark">🙂</span>
+        <textarea class="bullet-textarea" data-idx="${i}" rows="1" placeholder="Type a point…" title="Max ${BULLET_MAX_WORDS} words">${escapeHtml(b)}</textarea>
+        <span class="bullet-remove" data-idx="${i}" title="Remove this point">✕</span>
+      </div>`).join('');
+  return `<div class="desc-card-inner" xmlns="http://www.w3.org/1999/xhtml">
+      <div class="bullet-list">${rows}</div>
+      <button class="bullet-add" type="button">+ Add 🙂</button>
+      <div class="bullet-hint">Max ${BULLET_MAX_WORDS} words per point</div>
+    </div>`;
+}
+// Hovering a topic reveals its bullet-point popup next to it, and hovering into the popup
+// itself (instead of just the cell) keeps it open so it stays editable.
+let hoverCardNodeId = null, hoverHideTimer = null;
+function wireDescCard(fo, n, d, g) {
+  fo.html(buildDescCardHtml(n));
+  const inner = fo.select('.desc-card-inner');
+  inner.on('mousedown', e => e.stopPropagation());
+  inner.on('click', e => e.stopPropagation());
+  fo.selectAll('.bullet-textarea').each(function () { autoGrowTextarea(this); });
+  fo.selectAll('.bullet-textarea')
+    .on('input', function () {
+      applyWordCap(this, BULLET_MAX_WORDS);
+      autoGrowTextarea(this);
+    })
+    .on('blur', function () {
+      const idx = +this.getAttribute('data-idx');
+      n.bullets[idx] = limitWords(this.value.trim(), BULLET_MAX_WORDS);
+      save(); refreshHasContentDot(d, g);
+    });
+  fo.selectAll('.bullet-remove').on('click', function () {
+    const idx = +this.getAttribute('data-idx');
+    n.bullets.splice(idx, 1);
+    save(); wireDescCard(fo, n, d, g); refreshHasContentDot(d, g);
+    if (detailTopicId === n.id) showTopicDetail(n);
+  });
+  fo.select('.bullet-add').on('click', function () {
+    n.bullets = n.bullets || [];
+    n.bullets.push('');
+    save(); wireDescCard(fo, n, d, g);
+    const areas = fo.selectAll('.bullet-textarea').nodes();
+    if (areas.length) areas[areas.length - 1].focus();
+    if (detailTopicId === n.id) showTopicDetail(n);
+  });
+}
+function refreshHasContentDot(d, g) {
+  const n = d.data.nodeRef; if (!n) return;
+  (g || mapInner.selectAll('.map-node').filter(dd => dd === d)).select('.has-content-dot')
+    .style('display', hasBulletContent(n) ? 'block' : 'none');
+}
+function showHoverCard(d) {
+  clearTimeout(hoverHideTimer);
+  const n = d.data.nodeRef; if (!n) return;
+  if (hoverCardNodeId && hoverCardNodeId !== n.id) mapInner.selectAll('.desc-card').style('display', 'none');
+  hoverCardNodeId = n.id;
+  const g = mapInner.selectAll('.map-node').filter(dd => dd === d);
+  const fo = g.select('.desc-card');
+  fo.style('display', 'block');
+  wireDescCard(fo, n, d, g);
+  g.raise();
+}
+function scheduleHideHoverCard() {
+  clearTimeout(hoverHideTimer);
+  hoverHideTimer = setTimeout(() => { mapInner.selectAll('.desc-card').style('display', 'none'); hoverCardNodeId = null; }, 250);
+}
+function cancelHideHoverCard() { clearTimeout(hoverHideTimer); }
+
+// ── CLICK-TO-EDIT NODE TEXT ───────────────────────────────────────────────
+function editNodeName(event, d, gSel) {
+  event.stopPropagation();
+  d3.selectAll('.inline-edit-fo').remove();
+  setAnchor(d);
+
+  let getValue, setValue, fo;
+  if (d.data.type === 'root') {
+    const proj = () => activeMember().projects.find(p => p.id === d.data.projectId);
+    getValue = () => (proj() || {}).name || '';
+    setValue = v => { const p = proj(); if (p) p.name = v; };
+    fo = gSel.append('foreignObject').attr('class', 'inline-edit-fo').attr('x', -140).attr('y', -14).attr('width', 120).attr('height', 28);
+  } else if (d.data.type === 'topic') {
+    getValue = () => d.data.nodeRef.text;
+    setValue = v => { d.data.nodeRef.text = v; };
+    fo = gSel.append('foreignObject').attr('class', 'inline-edit-fo').attr('x', 11).attr('y', -10).attr('width', 180).attr('height', 20);
+  } else return;
+
+  // Hide the underlying SVG label while its foreignObject input sits on top of it — otherwise
+  // a wrapped multi-line label peeks out around the (single-line) edit box, reading as
+  // duplicated/overlapping text. commit() always triggers a full buildD3Map() rebuild (which
+  // recreates the label fresh, undoing this), but cancel() doesn't, so it restores it itself.
+  const labelSel = gSel.select('.editable-label');
+  labelSel.style('display', 'none');
+
+  const input = fo.append('xhtml:input').attr('class', 'inline-edit-input')
+    .attr('value', getValue())
+    .on('mousedown', e => e.stopPropagation())
+    .on('click', e => e.stopPropagation());
+  if (d.data.type === 'topic') {
+    input.attr('title', 'Max 5 words').on('input', function () {
+      applyWordCap(this, NODE_TEXT_MAX_WORDS);
+    });
+  }
+  const inputNode = input.node();
+  inputNode.focus();
+  inputNode.select();
+
+  let done = false;
+  function commit() {
+    if (done) return; done = true;
+    let v = inputNode.value.trim();
+    if (d.data.type === 'topic') v = limitWords(v, NODE_TEXT_MAX_WORDS);
+    fo.remove();
+    if (v && v !== getValue()) { setValue(v); save(); }
+    buildD3Map();
+  }
+  function cancel() { if (done) return; done = true; fo.remove(); labelSel.style('display', null); }
+
+  input.on('blur', commit);
+  input.on('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+  });
+}
+
+function isAnchor(d, m) {
+  if (d.data.type === 'root') return !m.lastTopicId && m.lastProjectId === d.data.projectId;
+  return !!d.data.nodeRef && d.data.nodeRef.id === m.lastTopicId;
+}
+function setAnchor(d) {
+  const m = activeMember(); if (!m) return;
+  if (d.data.type === 'root') { m.lastProjectId = d.data.projectId; m.lastTopicId = null; }
+  else { m.lastTopicId = d.data.nodeRef ? d.data.nodeRef.id : null; }
+  save(); updateToolbarHint();
+}
+function onNodeClick(d) {
+  setAnchor(d);
+  if (d.data.type === 'root') { mapUpdate(d); showRootDetail(activeMember(), d.data.projectId); return; }
+  showTopicDetail(d.data.nodeRef);
+  mapUpdate(d); // redraw so the anchor-ring highlight actually reflects the new selection
+}
+function resetMapView() {
+  if (!mapSvgSel || !mapZoom) return;
+  mapSvgSel.transition().duration(500).call(mapZoom.transform, d3.zoomIdentity.translate(16, 10).scale(0.9));
+}
+window.addEventListener('resize', () => buildD3Map());
+
+// ── INIT ─────────────────────────────────────────────────────────────────
+ensureMember();
+if (!data.activeId && data.members.length) data.activeId = data.members[0].id;
+renderAll();
+</script>
+</body>
+</html>
