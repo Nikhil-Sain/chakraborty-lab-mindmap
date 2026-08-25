@@ -1330,7 +1330,7 @@ function mapUpdate(source) {
 
   const range = computeWeekRange(m);
   const minBandWidth = 220, topMargin = 48, leftMargin = 190;
-  const colInset = 16, cellPadL = 18, cellPadR = 16, colRightMargin = 14, subGap = 8, subPadL = 10, subPadR = 9;
+  const colInset = 16, cellPadL = 18, cellPadR = 16, colRightMargin = 14, subPadL = 10, subPadR = 9;
   // Micro Node's parallelogram slants at both the top-left and bottom-right corners (skew,
   // capped at 13px) — its padding needs to clear that lean on both sides, not just the
   // straight-edge octagon's small corner cuts that Sub Node uses.
@@ -1364,13 +1364,6 @@ function mapUpdate(source) {
   // manually-dragged cell keeps the exact row it was dropped on, and anything else just
   // stacks below whatever else has already claimed that column so nothing overlaps.
   const colY = []; for (let c = 0; c < totalCols; c++) colY[c] = topMargin;
-  // Sub Node cells are a third-width and cascade three-to-a-week: the first one in a column
-  // is left-aligned, the second center-aligned, the third right-aligned, the fourth wraps
-  // back to left, and so on — each new one also hangs a little lower than the one before it,
-  // like a string of lanterns, so three real non-overlapping slots plus a vertical stagger
-  // keep both the cells and the connection lines reaching them from ever coinciding.
-  const colSubCascade = {};
-  const cascadeStep = 18;
   nodes.forEach(d => {
     if (d.data.type === 'root') return;
     const wk = weekOfYear(d.data.date);
@@ -1378,56 +1371,42 @@ function mapUpdate(source) {
     const col = idx - range.minIdx;
     const fullWidth = colWidths[col] - colInset - colRightMargin;
     const ref = d.data.nodeRef;
-    // Sub Node and Micro Node both get the narrow, third-width treatment and share one
-    // cascade per column — a Micro Node dropped into a column that already has Sub Nodes
-    // in it continues the same left/center/right rotation rather than starting its own.
     const isNarrow = ref && (ref.kind === 'sub' || ref.kind === 'subsub');
 
     if (isNarrow) {
       const [padL, padR] = ref.kind === 'subsub' ? [subsubPadL, subsubPadR] : [subPadL, subPadR];
-      const subWidth = (fullWidth - subGap * 2) / 3;
-      const lines = wrapNodeTitle(d.data.name, NODE_TITLE_FIRST_LINE_CHARS, subWidth - padL - padR, TOPIC_FONT);
-      const cellHeight = Math.max(minCellHeight, lines.length * lineHeight + cellPadY);
-      d.cellWidth = subWidth; d.cellHeight = cellHeight; d.lines = lines;
+      // Width follows the title's own length instead of a fixed slot — capped so the cell's
+      // right edge can never reach past the week column's actual vertical center line, no
+      // matter how long its text is (measured from the cell's left edge, colInset in from
+      // the column's own left edge, out to the column's midpoint).
+      const maxWidth = colWidths[col] / 2 - colInset;
+      const minWidth = 64;
+      const fit = wrapNarrowTitle(d.data.name, maxWidth - padL - padR, TOPIC_FONT);
+      const cellWidth = Math.min(maxWidth, Math.max(minWidth, fit.contentWidth + padL + padR));
+      const cellHeight = Math.max(minCellHeight, fit.lines.length * lineHeight + cellPadY);
+      d.cellWidth = cellWidth; d.cellHeight = cellHeight; d.lines = fit.lines;
 
+      // Left-aligned and stacked vertically, same as a full-width cell — width no longer
+      // being uniform across every cell means a left/center/right horizontal cascade
+      // doesn't apply anymore; each cell just claims its own row.
       if (ref.manualY != null) {
-        const priorCasc = colSubCascade[col];
-        colSubCascade[col] = null;
-        // Keep whichever slot this cell already occupied before it was dragged — a
-        // vertical-only drag shouldn't silently collapse every dragged Sub Node back onto
-        // the left slot and re-stack their lines on top of each other. A record dragged
-        // before that slot was tracked has no remembered x — rather than hard-defaulting
-        // those to the left slot (which looks like every one of them "broke"), continue
-        // the cascade from whatever came right before it in this column.
-        let fallbackX;
-        if (ref.manualX != null) fallbackX = ref.manualX;
-        else if (priorCasc) fallbackX = colX[col] + colInset + ((priorCasc.slot + 1) % 3) * (subWidth + subGap);
-        else fallbackX = colX[col] + colInset;
-        d.y = fallbackX;
+        d.y = ref.manualX != null ? ref.manualX : colX[col] + colInset;
         d.x = ref.manualY;
         colY[col] = Math.max(colY[col], ref.manualY + cellHeight / 2 + rowGap);
         return;
       }
-      const casc = colSubCascade[col];
-      let slot, top;
-      if (casc) {
-        slot = (casc.slot + 1) % 3;
-        top = casc.y + cascadeStep;
-      } else {
-        slot = 0;
-        const parent = d.parent;
-        const preferredTop = (parent && parent.data.type === 'topic') ? (parent.x - cellHeight / 2) : colY[col];
-        top = Math.max(colY[col], preferredTop);
-      }
-      d.y = colX[col] + colInset + slot * (subWidth + subGap);
+      const parent = d.parent;
+      const preferredTop = (parent && parent.data.type === 'topic') ? (parent.x - cellHeight / 2) : colY[col];
+      const top = Math.max(colY[col], preferredTop);
+      d.y = colX[col] + colInset;
       d.x = top + cellHeight / 2;
-      colSubCascade[col] = { slot, y: top };
       colY[col] = Math.max(colY[col], top + cellHeight + rowGap);
       return;
     }
 
-    colSubCascade[col] = null; // a full-width cell breaks the cascade
-    const lines = wrapNodeTitle(d.data.name, NODE_TITLE_FIRST_LINE_CHARS, fullWidth - cellPadL - cellPadR, TOPIC_FONT);
+    // A full-width Node always tries to fit its whole title on one line — if it doesn't
+    // fit, it's truncated with a trailing "-" rather than growing a second row.
+    const lines = fitOneLineOrTruncate(d.data.name, fullWidth - cellPadL - cellPadR, TOPIC_FONT);
     const cellHeight = Math.max(minCellHeight, lines.length * lineHeight + cellPadY);
     d.y = colX[col] + colInset;
     let top;
@@ -1861,33 +1840,61 @@ function wrapText(text, maxWidth, font) {
   flush();
   return lines.length ? lines : [''];
 }
-// Node/Sub Node/Micro Node titles get a deliberate two-line shape instead of however many
-// lines pixel-width wrapping happens to produce: the first line holds up to `firstLineChars`
-// characters (breaking at the last word boundary within that budget so whole words stay
-// together where possible), and every remaining word — still capped at 5 words total by
-// NODE_TEXT_MAX_WORDS — goes on the second line. If the very first word alone is longer than
-// the budget, it gets force-split mid-word with a trailing "-" rather than blowing past it.
-// wrapText is then run over each of those two lines as a pixel-width safety net, in case a
-// line (a run of unusually wide characters, or a very narrow cell) still doesn't fit as-is.
-function wrapNodeTitle(text, firstLineChars, maxWidth, font) {
+// A full-width Node always tries to fit its whole title on a single line. If it doesn't fit,
+// the title is truncated (never wrapped to a second row) — binary-searching for the longest
+// prefix that, with a trailing "-" appended, still fits the available width.
+function fitOneLineOrTruncate(text, maxWidth, font) {
   const clean = String(text || '').trim();
   if (!clean) return [''];
-  let firstLine, rest;
-  if (clean.length <= firstLineChars) {
-    firstLine = clean; rest = '';
-  } else {
-    let breakAt = -1;
-    for (let i = Math.min(firstLineChars, clean.length - 1); i >= 0; i--) {
-      if (clean[i] === ' ') { breakAt = i; break; }
-    }
-    if (breakAt > 0) { firstLine = clean.slice(0, breakAt); rest = clean.slice(breakAt + 1); }
-    else { firstLine = clean.slice(0, firstLineChars) + '-'; rest = clean.slice(firstLineChars); }
+  if (measureTextWidth(clean, font) <= maxWidth) return [clean];
+  let lo = 0, hi = clean.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (measureTextWidth(clean.slice(0, mid) + '-', font) <= maxWidth) lo = mid; else hi = mid - 1;
   }
-  const lines = wrapText(firstLine, maxWidth, font);
-  if (rest) lines.push(...wrapText(rest, maxWidth, font));
-  return lines;
+  return [clean.slice(0, Math.max(lo, 1)) + '-'];
 }
-const NODE_TITLE_FIRST_LINE_CHARS = 15;
+// Sub Node/Micro Node titles fit their (up to 5) words across at most two rows: row one is
+// filled greedily with as many whole words as fit the available width, and everything left
+// over goes on row two. If even the very first word alone doesn't fit, it's force-split
+// mid-word with a trailing "-" so the rest can continue onto row two. Row two is never
+// allowed to wrap into a third row — if it's still too wide (e.g. several long words left
+// over), it's truncated with a trailing "-" the same way a full-width Node would be, so the
+// title always stays within exactly two rows. Returns the content width actually used (the
+// widest of the resulting lines) so the caller can size the cell to fit its text.
+function wrapNarrowTitle(text, maxContentWidth, font) {
+  const clean = String(text || '').trim();
+  if (!clean) return { lines: [''], contentWidth: 0 };
+  const fullWidth = measureTextWidth(clean, font);
+  if (fullWidth <= maxContentWidth) return { lines: [clean], contentWidth: fullWidth };
+
+  const words = clean.split(/\s+/).filter(Boolean);
+  let row1 = '', i = 0;
+  for (; i < words.length; i++) {
+    const test = row1 ? row1 + ' ' + words[i] : words[i];
+    if (measureTextWidth(test, font) <= maxContentWidth) { row1 = test; } else break;
+  }
+  let row2Words = words.slice(i);
+  if (!row1) {
+    const word = words[0] || '';
+    let piece = '';
+    for (const ch of word) {
+      const test = piece + ch;
+      if (piece && measureTextWidth(test + '-', font) > maxContentWidth) break;
+      piece = test;
+    }
+    row1 = piece + '-';
+    row2Words = [word.slice(piece.length), ...words.slice(1)];
+  }
+
+  const lines = [row1];
+  const row2 = row2Words.join(' ').trim();
+  if (row2) {
+    lines.push(fitOneLineOrTruncate(row2, maxContentWidth, font)[0]);
+  }
+  const contentWidth = Math.max(...lines.map(l => measureTextWidth(l, font)));
+  return { lines, contentWidth };
+}
 
 // ── DRAG A CELL VERTICALLY WITHIN ITS OWN WEEK COLUMN ─────────────────────
 // Only ever adjusts the cell's row (d.x) — its column (d.y) is derived from its date and
