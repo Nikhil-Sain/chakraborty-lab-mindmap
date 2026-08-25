@@ -23,7 +23,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .login-logo{font-size:16px;font-weight:800;color:#1e293b;text-align:center;margin-bottom:18px}
 .login-error{font-size:11.5px;color:#991b1b;background:#fee2e2;border-radius:6px;padding:6px 9px;margin-bottom:10px;display:none}
 .login-error.show{display:block}
+.login-error.success{color:#166534;background:#dcfce7}
 .login-hint{font-size:10.5px;color:#9ca3af;text-align:center;margin-top:12px;line-height:1.4}
+.login-forgot{display:block;text-align:center;font-size:11px;color:#7c3aed;margin-top:10px;cursor:pointer;background:none;border:none;font-family:inherit;width:100%}
+.login-forgot:hover{text-decoration:underline}
 
 .main{padding:18px;flex:1 1 auto;min-height:0;display:flex;flex-direction:row;gap:12px}
 .main-content{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
@@ -181,6 +184,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
     </div>
     <div class="login-error" id="login-error"></div>
     <button class="btn btn-save" id="login-submit" onclick="handleLoginSubmit()" style="width:100%">Sign In</button>
+    <button type="button" class="login-forgot" onclick="handleForgotPassword()">Forgot password?</button>
     <div class="login-hint">Don't have a login? Ask your lab admin to create one for you.</div>
   </div>
 </div>
@@ -341,6 +345,7 @@ window.firebaseReady = new Promise(res => { window.firebaseReadyResolve = res; }
 
   window.fbSignIn = (email, pw) => signInWithEmailAndPassword(auth, email, pw);
   window.fbSignOut = () => signOut(auth);
+  window.fbSendPasswordReset = (email) => sendPasswordResetEmail(auth, email);
   window.fbDoc = (...path) => doc(db, ...path);
   window.fbSetDoc = (ref, data) => setDoc(ref, data);
   window.fbGetDoc = (ref) => getDoc(ref);
@@ -529,7 +534,7 @@ document.addEventListener('keydown', e => {
 let unsubscribeMembers = null;
 function showLoginScreen() {
   document.getElementById('login-overlay').classList.add('open');
-  document.getElementById('login-error').classList.remove('show');
+  document.getElementById('login-error').classList.remove('show', 'success');
 }
 function hideLoginScreen() { document.getElementById('login-overlay').classList.remove('open'); }
 async function handleLoginSubmit() {
@@ -547,6 +552,24 @@ async function handleLoginSubmit() {
     errEl.classList.add('show');
   }
   btn.disabled = false; btn.textContent = 'Sign In';
+}
+async function handleForgotPassword() {
+  const email = document.getElementById('login-email').value.trim();
+  const errEl = document.getElementById('login-error');
+  errEl.classList.remove('success');
+  if (!email) {
+    errEl.textContent = 'Enter your email above first, then click "Forgot password?".';
+    errEl.classList.add('show');
+    return;
+  }
+  try {
+    await window.fbSendPasswordReset(email);
+    errEl.textContent = `Reset email sent to ${email} — check your inbox.`;
+    errEl.classList.add('success', 'show');
+  } catch (e) {
+    errEl.textContent = e.code === 'auth/invalid-email' ? "That doesn't look like a valid email." : 'Could not send a reset email for that address.';
+    errEl.classList.add('show');
+  }
 }
 document.addEventListener('DOMContentLoaded', () => {
   const pw = document.getElementById('login-password');
