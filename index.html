@@ -1386,7 +1386,7 @@ function mapUpdate(source) {
     if (isNarrow) {
       const [padL, padR] = ref.kind === 'subsub' ? [subsubPadL, subsubPadR] : [subPadL, subPadR];
       const subWidth = (fullWidth - subGap * 2) / 3;
-      const lines = wrapText(d.data.name, subWidth - padL - padR, TOPIC_FONT);
+      const lines = wrapNodeTitle(d.data.name, NODE_TITLE_FIRST_LINE_CHARS, subWidth - padL - padR, TOPIC_FONT);
       const cellHeight = Math.max(minCellHeight, lines.length * lineHeight + cellPadY);
       d.cellWidth = subWidth; d.cellHeight = cellHeight; d.lines = lines;
 
@@ -1427,7 +1427,7 @@ function mapUpdate(source) {
     }
 
     colSubCascade[col] = null; // a full-width cell breaks the cascade
-    const lines = wrapText(d.data.name, fullWidth - cellPadL - cellPadR, TOPIC_FONT);
+    const lines = wrapNodeTitle(d.data.name, NODE_TITLE_FIRST_LINE_CHARS, fullWidth - cellPadL - cellPadR, TOPIC_FONT);
     const cellHeight = Math.max(minCellHeight, lines.length * lineHeight + cellPadY);
     d.y = colX[col] + colInset;
     let top;
@@ -1861,6 +1861,33 @@ function wrapText(text, maxWidth, font) {
   flush();
   return lines.length ? lines : [''];
 }
+// Node/Sub Node/Micro Node titles get a deliberate two-line shape instead of however many
+// lines pixel-width wrapping happens to produce: the first line holds up to `firstLineChars`
+// characters (breaking at the last word boundary within that budget so whole words stay
+// together where possible), and every remaining word — still capped at 5 words total by
+// NODE_TEXT_MAX_WORDS — goes on the second line. If the very first word alone is longer than
+// the budget, it gets force-split mid-word with a trailing "-" rather than blowing past it.
+// wrapText is then run over each of those two lines as a pixel-width safety net, in case a
+// line (a run of unusually wide characters, or a very narrow cell) still doesn't fit as-is.
+function wrapNodeTitle(text, firstLineChars, maxWidth, font) {
+  const clean = String(text || '').trim();
+  if (!clean) return [''];
+  let firstLine, rest;
+  if (clean.length <= firstLineChars) {
+    firstLine = clean; rest = '';
+  } else {
+    let breakAt = -1;
+    for (let i = Math.min(firstLineChars, clean.length - 1); i >= 0; i--) {
+      if (clean[i] === ' ') { breakAt = i; break; }
+    }
+    if (breakAt > 0) { firstLine = clean.slice(0, breakAt); rest = clean.slice(breakAt + 1); }
+    else { firstLine = clean.slice(0, firstLineChars) + '-'; rest = clean.slice(firstLineChars); }
+  }
+  const lines = wrapText(firstLine, maxWidth, font);
+  if (rest) lines.push(...wrapText(rest, maxWidth, font));
+  return lines;
+}
+const NODE_TITLE_FIRST_LINE_CHARS = 15;
 
 // ── DRAG A CELL VERTICALLY WITHIN ITS OWN WEEK COLUMN ─────────────────────
 // Only ever adjusts the cell's row (d.x) — its column (d.y) is derived from its date and
