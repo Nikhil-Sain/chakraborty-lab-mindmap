@@ -423,6 +423,12 @@ let nodeModalCallback = null;
 let mapRoot = null, mapZoom = null, mapSvgSel = null, mapInner = null, mapNodePositions = {}, mapNodeId = 0;
 let connectFromId = null, detailTopicId = null;
 let obstacleCache = []; // every topic cell's rect, refreshed once per render — curves check against this to route around cells they don't touch
+// The small symmetric nudge (see fanOffset() inside mapUpdate) each tree-link/connection
+// endpoint gets when it shares a node with other lines — captured once per render so a live
+// drag can keep applying the SAME offset to a moving endpoint instead of drawing it at the
+// node's raw (unfanned) position, which is what previously made handles/lines briefly bunch
+// together and mismatch the moment you started dragging.
+let treeLinkFanOffset = new Map(), connFanOffset = new Map();
 let undoStack = [], redoStack = [];
 const UNDO_LIMIT = 60;
 
@@ -1381,16 +1387,22 @@ function mapUpdate(source) {
       // the column's own left edge, out to the column's midpoint).
       const maxWidth = colWidths[col] / 2 - colInset;
       const minWidth = 64;
-      const fit = wrapNarrowTitle(d.data.name, maxWidth - padL - padR, TOPIC_FONT);
-      const cellWidth = Math.min(maxWidth, Math.max(minWidth, fit.contentWidth + padL + padR));
-      const cellHeight = Math.max(minCellHeight, fit.lines.length * lineHeight + cellPadY);
-      d.cellWidth = cellWidth; d.cellHeight = cellHeight; d.lines = fit.lines;
+      const contentWidth = maxWidth - padL - padR;
+      const lines = wrapToRows(d.data.name, contentWidth, TOPIC_FONT, NARROW_MAX_ROWS);
+      const linesWidth = Math.max(...lines.map(l => measureTextWidth(l, TOPIC_FONT)));
+      const cellWidth = Math.min(maxWidth, Math.max(minWidth, linesWidth + padL + padR));
+      const cellHeight = Math.max(minCellHeight, lines.length * lineHeight + cellPadY);
+      d.cellWidth = cellWidth; d.cellHeight = cellHeight; d.lines = lines;
+      // How far this cell is allowed to slide horizontally when dragged — anywhere within
+      // its own week column, never into a neighboring one.
+      d.colMinX = colX[col] + colInset;
+      d.colMaxX = colX[col] + colWidths[col] - colRightMargin - cellWidth;
 
       // Left-aligned and stacked vertically, same as a full-width cell — width no longer
       // being uniform across every cell means a left/center/right horizontal cascade
       // doesn't apply anymore; each cell just claims its own row.
       if (ref.manualY != null) {
-        d.y = ref.manualX != null ? ref.manualX : colX[col] + colInset;
+        d.y = ref.manualX != null ? Math.min(d.colMaxX, Math.max(d.colMinX, ref.manualX)) : colX[col] + colInset;
         d.x = ref.manualY;
         colY[col] = Math.max(colY[col], ref.manualY + cellHeight / 2 + rowGap);
         return;
@@ -1404,11 +1416,14 @@ function mapUpdate(source) {
       return;
     }
 
-    // A full-width Node always tries to fit its whole title on one line — if it doesn't
-    // fit, it's truncated with a trailing "-" rather than growing a second row.
-    const lines = fitOneLineOrTruncate(d.data.name, fullWidth - cellPadL - cellPadR, TOPIC_FONT);
+    // A full-width Node wraps across at most two rows — only truncated (trailing "-") if
+    // the title still doesn't fit even after that.
+    const lines = wrapToRows(d.data.name, fullWidth - cellPadL - cellPadR, TOPIC_FONT, NODE_MAX_ROWS);
     const cellHeight = Math.max(minCellHeight, lines.length * lineHeight + cellPadY);
     d.y = colX[col] + colInset;
+    // A Node's box is always the column's full usable width, so there's nowhere to slide
+    // horizontally — both bounds land on the same spot and a drag simply can't move it.
+    d.colMinX = d.colMaxX = colX[col] + colInset;
     let top;
     if (ref && ref.manualY != null) {
       top = ref.manualY - cellHeight / 2;
@@ -1483,9 +1498,14 @@ function mapUpdate(source) {
   const bump = id => { fanTotal[id] = (fanTotal[id] || 0) + 1; };
   links.forEach(l => { bump(l.source.data.id); bump(l.target.data.id); });
   (m.connections || []).forEach(c => { bump(c.a); bump(c.b); });
-  function fanned(pos, id) {
+  // fanOffset(id) advances a shared counter each time it's called for a given id, so it must
+  // be called exactly ONCE per line-endpoint and the {dx,dy} result reused everywhere that
+  // endpoint is drawn (the line itself, its arrow, its selection handle, and its live-dragged
+  // position) — calling it again hands out the NEXT slot in the rotation instead of the same
+  // one, which is what let a handle end up drawn at a different offset than its own line.
+  function fanOffset(id) {
     const total = fanTotal[id] || 1;
-    if (total <= 1) return pos;
+    if (total <= 1) return null;
     const idx = (fanUsed[id] = (fanUsed[id] || 0) + 1) - 1;
     const offset = (idx - (total - 1) / 2) * 9;
     // Nudging only the vertical component only actually separates lines that leave from a
@@ -1493,7 +1513,7 @@ function mapUpdate(source) {
     // parent and its Sub Nodes sitting in the very same week), that edge's anchor x is
     // pos.x + w/2, so it needs the horizontal nudge too or every line still leaves from the
     // same point. Shifting both keeps whichever edge ends up chosen properly fanned out.
-    return { ...pos, x: pos.x + offset, y: pos.y + offset };
+    return { dx: offset, dy: offset };
   }
 
   // tree edges (topic -> sub-topic "trail") — smooth curves between the cells' centers, with
@@ -1509,15 +1529,18 @@ function mapUpdate(source) {
     .on('click', (event, d) => openThreadMenu(event, { type: 'tree', id: d.target.data.nodeRef.id }));
   linkEnter.append('title').text('Click the line to change its color or style');
   const linkMerged = link.merge(linkEnter);
-  // fanned() advances a shared counter each time it's called for a given id, so it must be
-  // called exactly ONCE per link and the result reused for both the line and its arrow —
-  // calling it twice (once per element) handed each a different fan offset and made the
-  // arrow drift away from the line it belonged to.
+  // fanOffset() advances a shared counter each time it's called for a given id, so each
+  // endpoint's offset is captured exactly once here (into treeLinkFanOffset) and reused by
+  // the line, its arrow, its selection handle, and its live-dragged position — calling it
+  // again anywhere else would hand out a different offset and make that element drift away
+  // from the line it's supposed to belong to.
   const linkPos = new Map();
-  links.forEach(d => linkPos.set(d.target.data.id, {
-    sp: fanned(nodePos(d.source), d.source.data.id),
-    tp: fanned(nodePos(d.target), d.target.data.id)
-  }));
+  treeLinkFanOffset = new Map();
+  links.forEach(d => {
+    const so = fanOffset(d.source.data.id), to = fanOffset(d.target.data.id);
+    treeLinkFanOffset.set(d.target.data.id, { so, to });
+    linkPos.set(d.target.data.id, { sp: applyOffset(nodePos(d.source), so), tp: applyOffset(nodePos(d.target), to) });
+  });
   linkMerged.transition().duration(duration).style('opacity', 1)
     .attr('d', d => { const p = linkPos.get(d.target.data.id); return curvePath(p.sp, p.tp); });
   linkMerged.attr('stroke', d => (d.target.data.nodeRef && d.target.data.nodeRef.linkColor) || DEFAULT_TREE_COLOR)
@@ -1544,8 +1567,11 @@ function mapUpdate(source) {
   if (threadTarget && threadTarget.type === 'tree') {
     const selLink = links.find(l => l.target.data.nodeRef && l.target.data.nodeRef.id === threadTarget.id);
     if (selLink) {
-      const posP = fanned(nodePos(selLink.source), selLink.source.data.id);
-      const posC = fanned(nodePos(selLink.target), selLink.target.data.id);
+      // Reuse the exact positions already computed for this link's own line/arrow — calling
+      // fanOffset() again here would advance its shared per-node counter a second time and
+      // hand the handle a different offset than the line it's supposed to sit on top of.
+      const p = linkPos.get(selLink.target.data.id);
+      const posP = p.sp, posC = p.tp;
       [{ pos: edgeAnchor(posP, posC), key: 'parent' }, { pos: edgeAnchor(posC, posP), key: 'child' }].forEach(h => {
         mapInner.append('circle').attr('class', 'tree-handle')
           .attr('cx', h.pos.x).attr('cy', h.pos.y).attr('r', 6)
@@ -1560,12 +1586,15 @@ function mapUpdate(source) {
   // arrow sitting at the curve's midpoint; clicking the line opens the same color/style
   // editor, and reveals its own end-handles (only the selected connection's are shown).
   mapInner.selectAll('.conn-link, .conn-handle, .conn-arrow').remove();
+  connFanOffset = new Map();
   (m.connections || []).forEach(conn => {
     const pa = mapNodePositions[conn.a], pb = mapNodePositions[conn.b];
     if (!pa || !pb) return;
     const col = conn.color || DEFAULT_CONN_COLOR;
     const selected = threadTarget && threadTarget.type === 'conn' && threadTarget.id === conn.id;
-    const fa = fanned(pa, conn.a), fb = fanned(pb, conn.b);
+    const oa = fanOffset(conn.a), ob = fanOffset(conn.b);
+    connFanOffset.set(conn.id, { oa, ob });
+    const fa = applyOffset(pa, oa), fb = applyOffset(pb, ob);
     const cornerA = edgeAnchor(fa, fb), cornerB = edgeAnchor(fb, fa);
     mapInner.insert('path', '.map-node').attr('class', 'conn-link').attr('data-conn', conn.id)
       .attr('fill', 'none').attr('stroke', col).attr('stroke-opacity', 0.85).attr('stroke-width', selected ? THREAD_WIDTH + 1.5 : THREAD_WIDTH)
@@ -1631,7 +1660,7 @@ function mapUpdate(source) {
     .on('click', function (event, d) { editNodeName(event, d, d3.select(this.parentNode)); });
   // A 2x3 grid of dots (bigger and more numerous than a single glyph) plus a generous
   // invisible hit-area behind them, so the grab handle is easy to spot and easy to land on.
-  const dragHandle = tE.append('g').attr('class', 'drag-handle').style('cursor', 'ns-resize').call(topicDragBehavior())
+  const dragHandle = tE.append('g').attr('class', 'drag-handle').style('cursor', 'move').call(topicDragBehavior())
     .on('dblclick', function (event, d) {
       event.stopPropagation();
       // Repositioning stays allowed even on a committed (locked) node — only its content
@@ -1641,18 +1670,24 @@ function mapUpdate(source) {
       save(); buildD3Map();
     });
   dragHandle.append('rect').attr('class', 'drag-handle-hit')
-    .attr('x', -11).attr('y', d => -Math.max(d.cellHeight, 26) / 2).attr('width', 18).attr('height', d => Math.max(d.cellHeight, 26))
+    .attr('x', -18).attr('y', d => -Math.max(d.cellHeight, 26) / 2).attr('width', 29).attr('height', d => Math.max(d.cellHeight, 26))
     .attr('fill', 'transparent');
   dragHandle.append('text').attr('class', 'drag-handle-arrow').attr('x', -3).attr('y', -9)
     .attr('text-anchor', 'middle').attr('font-size', 8).attr('fill', '#1e293b')
     .style('pointer-events', 'none').style('user-select', 'none').text('▲');
+  dragHandle.append('text').attr('class', 'drag-handle-arrow').attr('x', -13).attr('y', 4)
+    .attr('text-anchor', 'middle').attr('font-size', 8).attr('fill', '#1e293b')
+    .style('pointer-events', 'none').style('user-select', 'none').text('◀');
   dragHandle.append('text').attr('class', 'drag-handle-face').attr('x', -3).attr('y', 4)
     .attr('text-anchor', 'middle').attr('font-size', 12)
     .style('pointer-events', 'none').style('user-select', 'none').text('🙂');
+  dragHandle.append('text').attr('class', 'drag-handle-arrow').attr('x', 7).attr('y', 4)
+    .attr('text-anchor', 'middle').attr('font-size', 8).attr('fill', '#1e293b')
+    .style('pointer-events', 'none').style('user-select', 'none').text('▶');
   dragHandle.append('text').attr('class', 'drag-handle-arrow').attr('x', -3).attr('y', 14)
     .attr('text-anchor', 'middle').attr('font-size', 8).attr('fill', '#1e293b')
     .style('pointer-events', 'none').style('user-select', 'none').text('▼');
-  dragHandle.append('title').text("Drag up/down to reposition within this cell's week · double-click to reset to automatic placement");
+  dragHandle.append('title').text("Drag to reposition anywhere within this cell's week · double-click to reset to automatic placement");
   tE.append('circle').attr('class', 'has-content-dot').attr('r', 3.5).attr('fill', '#4f46e5').attr('stroke', '#fff').attr('stroke-width', 1).style('display', 'none');
   tE.append('text').attr('class', 'lock-badge').attr('font-size', 11).style('pointer-events', 'none').style('display', 'none').text('🔒');
   tE.append('foreignObject').attr('class', 'desc-card').attr('width', 220).attr('height', 190).attr('y', -20).style('display', 'none')
@@ -1670,9 +1705,17 @@ function mapUpdate(source) {
     textSel.selectAll('tspan').remove();
     const k = nodeKind(d);
     const padL = k === 'sub' ? subPadL : k === 'subsub' ? subsubPadL : cellPadL;
+    // A Node's box is always the full column width regardless of how short its title is —
+    // left-aligning it (like the content-fit Sub Node/Micro Node boxes, where left-align and
+    // centered are barely distinguishable) left short titles looking glued to the left edge
+    // of a wide, symmetric ribbon. Centering only the 'node' kind fixes that without touching
+    // the narrow kinds, whose boxes already hug their own text.
+    const isCentered = k === 'node';
+    textSel.attr('text-anchor', isCentered ? 'middle' : 'start');
     lines.forEach((line, i) => {
       const y = -((lines.length - 1) * lineHeight) / 2 + i * lineHeight;
-      textSel.append('tspan').attr('x', padL).attr('y', y).attr('dy', '0.35em').text(line);
+      const x = isCentered ? d.cellWidth / 2 : padL;
+      textSel.append('tspan').attr('x', x).attr('y', y).attr('dy', '0.35em').text(line);
     });
     // Sits right on the cell's top-right corner (not inset into it) so it never lands in the
     // same few pixels text wraps into — the 'sub' shape's own right padding (subPadR) is only
@@ -1705,6 +1748,12 @@ function nodePos(d) {
     h: d.data.type === 'topic' ? (d.cellHeight || 0) : 0,
     id: d.data.nodeRef ? d.data.nodeRef.id : null
   };
+}
+// Re-applies a previously captured fan nudge (see treeLinkFanOffset/connFanOffset) to a
+// freshly computed position — used so a live-dragged endpoint keeps the same fanned-out slot
+// its line/handle was already drawn at, instead of jumping to the node's raw center.
+function applyOffset(pos, off) {
+  return off ? { ...pos, x: pos.x + off.dx, y: pos.y + off.dy } : pos;
 }
 // A thread anchors at the center of whichever edge (left/right/top/bottom) of the cell
 // faces the OTHER end of that thread, touching the cell's actual boundary exactly (no gap).
@@ -1840,90 +1889,75 @@ function wrapText(text, maxWidth, font) {
   flush();
   return lines.length ? lines : [''];
 }
-// A full-width Node always tries to fit its whole title on a single line. If it doesn't fit,
-// the title is truncated (never wrapped to a second row) — binary-searching for the longest
-// prefix that, with a trailing "-" appended, still fits the available width.
-function fitOneLineOrTruncate(text, maxWidth, font) {
+// A Node wraps across at most two rows; a Sub Node/Micro Node uses a third row only if it's
+// actually needed.
+const NODE_MAX_ROWS = 2;
+const NARROW_MAX_ROWS = 3;
+// Lays a title out with ordinary word-wrap (wrapText already force-breaks a single word too
+// wide for even its own row, letter by letter) and then caps the result at maxRows. Right up
+// until that cap, nothing is ever dropped — a row that runs out of width simply continues
+// onto the next one, exactly like normal text wrapping. Only if the title still needs more
+// rows than the cap allows does the last kept row get truncated, trimmed just enough to fit
+// a trailing "-" — that's the one place content can actually be lost.
+function wrapToRows(text, maxWidth, font, maxRows) {
   const clean = String(text || '').trim();
   if (!clean) return [''];
-  if (measureTextWidth(clean, font) <= maxWidth) return [clean];
-  let lo = 0, hi = clean.length;
-  while (lo < hi) {
-    const mid = Math.ceil((lo + hi) / 2);
-    if (measureTextWidth(clean.slice(0, mid) + '-', font) <= maxWidth) lo = mid; else hi = mid - 1;
-  }
-  return [clean.slice(0, Math.max(lo, 1)) + '-'];
-}
-// Sub Node/Micro Node titles fit their (up to 5) words across at most two rows: row one is
-// filled greedily with as many whole words as fit the available width, and everything left
-// over goes on row two. If even the very first word alone doesn't fit, it's force-split
-// mid-word with a trailing "-" so the rest can continue onto row two. Row two is never
-// allowed to wrap into a third row — if it's still too wide (e.g. several long words left
-// over), it's truncated with a trailing "-" the same way a full-width Node would be, so the
-// title always stays within exactly two rows. Returns the content width actually used (the
-// widest of the resulting lines) so the caller can size the cell to fit its text.
-function wrapNarrowTitle(text, maxContentWidth, font) {
-  const clean = String(text || '').trim();
-  if (!clean) return { lines: [''], contentWidth: 0 };
-  const fullWidth = measureTextWidth(clean, font);
-  if (fullWidth <= maxContentWidth) return { lines: [clean], contentWidth: fullWidth };
-
-  const words = clean.split(/\s+/).filter(Boolean);
-  let row1 = '', i = 0;
-  for (; i < words.length; i++) {
-    const test = row1 ? row1 + ' ' + words[i] : words[i];
-    if (measureTextWidth(test, font) <= maxContentWidth) { row1 = test; } else break;
-  }
-  let row2Words = words.slice(i);
-  if (!row1) {
-    const word = words[0] || '';
-    let piece = '';
-    for (const ch of word) {
-      const test = piece + ch;
-      if (piece && measureTextWidth(test + '-', font) > maxContentWidth) break;
-      piece = test;
-    }
-    row1 = piece + '-';
-    row2Words = [word.slice(piece.length), ...words.slice(1)];
-  }
-
-  const lines = [row1];
-  const row2 = row2Words.join(' ').trim();
-  if (row2) {
-    lines.push(fitOneLineOrTruncate(row2, maxContentWidth, font)[0]);
-  }
-  const contentWidth = Math.max(...lines.map(l => measureTextWidth(l, font)));
-  return { lines, contentWidth };
+  const all = wrapText(clean, maxWidth, font);
+  if (all.length <= maxRows) return all;
+  const kept = all.slice(0, maxRows);
+  let last = kept[maxRows - 1];
+  while (last.length > 0 && measureTextWidth(last + '-', font) > maxWidth) last = last.slice(0, -1);
+  kept[maxRows - 1] = (last || kept[maxRows - 1].slice(0, 1)) + '-';
+  return kept;
 }
 
-// ── DRAG A CELL VERTICALLY WITHIN ITS OWN WEEK COLUMN ─────────────────────
-// Only ever adjusts the cell's row (d.x) — its column (d.y) is derived from its date and
-// is never touched here, so the entry can never leave its own week.
+// ── DRAG A CELL FREELY WITHIN ITS OWN WEEK COLUMN ─────────────────────────
+// Both the row (d.x) and the horizontal slot (d.y) can move, but d.y is always clamped to
+// d.colMinX/d.colMaxX — the cell's own week, fixed by its date — so it can be dragged
+// anywhere within that column but never into a neighboring one.
 function topicDragBehavior() {
-  let curX, dragAllowed;
+  let curX, curY, dragAllowed;
   return d3.drag()
     .on('start', function (event, d) {
       event.sourceEvent.stopPropagation();
       // Repositioning is exempt from the commit lock — only content edits are frozen.
       dragAllowed = canEditBoard();
       curX = d.x;
+      curY = d.y;
     })
     .on('drag', function (event, d) {
       if (!dragAllowed) return;
       curX += event.dy;
+      // Horizontal movement is free within the cell's own week column, but never crosses
+      // into a neighboring one — d.colMinX/d.colMaxX (set during layout) are that column's
+      // left/right slide limits for this exact cell width.
+      curY = Math.min(d.colMaxX, Math.max(d.colMinX, curY + event.dx));
       d.x = curX;
-      d3.select(this.parentNode).attr('transform', `translate(${d.y},${curX})`);
+      d.y = curY;
+      d3.select(this.parentNode).attr('transform', `translate(${curY},${curX})`);
       const id = d.data.nodeRef.id;
       const pos = mapNodePositions[id];
-      if (pos) pos.y = curX;
+      if (pos) { pos.x = curY; pos.y = curX; }
+      // Every line/handle keeps the same fan nudge it was drawn with at the last full render
+      // (treeLinkFanOffset/connFanOffset) — reapplying it here to the dragged node's live
+      // position is what keeps a moving endpoint lined up with its own handle instead of both
+      // snapping back together mid-drag and re-fanning apart the moment you let go.
       mapInner.selectAll('.tree-link').filter(l => l.source === d || l.target === d)
-        .attr('d', l => curvePath(nodePos(l.source), nodePos(l.target)));
+        .attr('d', l => {
+          const o = treeLinkFanOffset.get(l.target.data.id);
+          return curvePath(applyOffset(nodePos(l.source), o && o.so), applyOffset(nodePos(l.target), o && o.to));
+        });
       mapInner.selectAll('.tree-arrow').filter(l => l.source === d || l.target === d)
-        .attr('transform', l => { const a = curveMidArrow(nodePos(l.source), nodePos(l.target)); return `translate(${a.x},${a.y}) rotate(${a.angle})`; });
+        .attr('transform', l => {
+          const o = treeLinkFanOffset.get(l.target.data.id);
+          const a = curveMidArrow(applyOffset(nodePos(l.source), o && o.so), applyOffset(nodePos(l.target), o && o.to));
+          return `translate(${a.x},${a.y}) rotate(${a.angle})`;
+        });
       if (threadTarget && threadTarget.type === 'tree' && threadTarget.id === id) {
         const selLink = mapRoot.links().find(l => l.target.data.nodeRef && l.target.data.nodeRef.id === id);
         if (selLink) {
-          const posP = nodePos(selLink.source), posC = nodePos(selLink.target);
+          const o = treeLinkFanOffset.get(selLink.target.data.id);
+          const posP = applyOffset(nodePos(selLink.source), o && o.so), posC = applyOffset(nodePos(selLink.target), o && o.to);
           const corners = [edgeAnchor(posP, posC), edgeAnchor(posC, posP)];
           mapInner.selectAll('.tree-handle').each(function (_, i) { d3.select(this).attr('cx', corners[i].x).attr('cy', corners[i].y); });
         }
@@ -1931,8 +1965,10 @@ function topicDragBehavior() {
       const m = activeMember();
       (m.connections || []).forEach(conn => {
         if (conn.a !== id && conn.b !== id) return;
-        const pa = mapNodePositions[conn.a], pb = mapNodePositions[conn.b];
-        if (!pa || !pb) return;
+        const rawA = mapNodePositions[conn.a], rawB = mapNodePositions[conn.b];
+        if (!rawA || !rawB) return;
+        const o = connFanOffset.get(conn.id);
+        const pa = applyOffset(rawA, o && o.oa), pb = applyOffset(rawB, o && o.ob);
         mapInner.select(`.conn-link[data-conn="${conn.id}"]`).attr('d', curvePath(pa, pb));
         const cornerA = edgeAnchor(pa, pb), cornerB = edgeAnchor(pb, pa);
         mapInner.select(`.conn-handle[data-conn="${conn.id}"][data-end="a"]`).attr('cx', cornerA.x).attr('cy', cornerA.y);
@@ -1944,7 +1980,7 @@ function topicDragBehavior() {
     .on('end', function (event, d) {
       if (!dragAllowed) return;
       d.data.nodeRef.manualY = curX;
-      d.data.nodeRef.manualX = d.y; // preserve its current left/right slot — this drag only ever moved it vertically
+      d.data.nodeRef.manualX = curY;
       save();
       buildD3Map();
     });
@@ -2015,7 +2051,10 @@ function treeEndpointDrag(childId, endKey) {
       const selLink = mapRoot.links().find(l => l.target.data.nodeRef && l.target.data.nodeRef.id === childId);
       if (!selLink) return;
       const draggedPos = { x: cx, y: cy, w: 0 };
-      const otherPos = endKey === 'parent' ? nodePos(selLink.target) : nodePos(selLink.source);
+      // The end you're NOT dragging stays put at its own fanned slot (same offset its handle
+      // was drawn with) rather than snapping to the node's raw center while the other end moves.
+      const o = treeLinkFanOffset.get(childId);
+      const otherPos = endKey === 'parent' ? applyOffset(nodePos(selLink.target), o && o.to) : applyOffset(nodePos(selLink.source), o && o.so);
       const pa = endKey === 'parent' ? draggedPos : otherPos;
       const pb = endKey === 'parent' ? otherPos : draggedPos;
       mapInner.selectAll('.tree-link').filter(l => l.target.data.nodeRef && l.target.data.nodeRef.id === childId)
@@ -2050,8 +2089,10 @@ function connEndpointDrag(connId, endKey) {
       d3.select(this).attr('cx', cx).attr('cy', cy);
       const m = activeMember(); const conn = m && findConnection(m, connId); if (!conn) return;
       const otherKey = endKey === 'a' ? 'b' : 'a';
-      const otherPos = mapNodePositions[conn[otherKey]];
-      if (!otherPos) return;
+      const rawOther = mapNodePositions[conn[otherKey]];
+      if (!rawOther) return;
+      const o = connFanOffset.get(connId);
+      const otherPos = applyOffset(rawOther, otherKey === 'a' ? (o && o.oa) : (o && o.ob));
       const draggedPos = { x: cx, y: cy, w: 0 };
       const pa = endKey === 'a' ? draggedPos : otherPos;
       const pb = endKey === 'a' ? otherPos : draggedPos;
