@@ -12,8 +12,34 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .hdr{height:52px;flex-shrink:0;display:flex;align-items:center;gap:14px;padding:0 18px;background:linear-gradient(120deg,#4338ca,#0891b2);box-shadow:0 2px 10px rgba(67,56,202,.25)}
 .hdr-logo{font-size:15px;font-weight:700;color:#eef2ff;white-space:nowrap}
 .hdr-spacer{flex:1}
+.btn-hdr{padding:6px 12px;margin-left:8px;border-radius:8px;border:1.5px solid rgba(255,255,255,.3);background:rgba(255,255,255,.12);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.btn-hdr:hover{background:rgba(255,255,255,.22)}
+.admin-badge{background:#ede9fe;border-color:#c4b5fd;color:#6d28d9;cursor:default}
 
-.main{padding:18px;flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+/* ── Login screen ── */
+.login-overlay{display:none;position:fixed;inset:0;z-index:300;align-items:center;justify-content:center;background:linear-gradient(180deg,#eef2ff 0%,#f6f8fc 100%)}
+.login-overlay.open{display:flex}
+.login-box{background:#fff;border-radius:14px;padding:28px;width:320px;max-width:90vw;box-shadow:0 20px 56px rgba(67,56,202,.18)}
+.login-logo{font-size:16px;font-weight:800;color:#1e293b;text-align:center;margin-bottom:18px}
+.login-error{font-size:11.5px;color:#991b1b;background:#fee2e2;border-radius:6px;padding:6px 9px;margin-bottom:10px;display:none}
+.login-error.show{display:block}
+.login-hint{font-size:10.5px;color:#9ca3af;text-align:center;margin-top:12px;line-height:1.4}
+
+.main{padding:18px;flex:1 1 auto;min-height:0;display:flex;flex-direction:row;gap:12px}
+.main-content{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
+
+/* ── Member sidebar (vertical tabs, one per member, with an optional avatar) ── */
+.member-sidebar{width:92px;flex-shrink:0;display:flex;flex-direction:column;gap:5px;padding:10px 6px;background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(67,56,202,.08);overflow-y:auto}
+.member-tab{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 4px;border-radius:10px;cursor:pointer;text-align:center}
+.member-tab:hover{background:#f3f4f6}
+.member-tab.active{background:#ede9fe}
+.member-avatar{width:42px;height:42px;border-radius:50%;background-color:#a78bfa;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;flex-shrink:0;border:2px solid #fff;box-shadow:0 0 0 1.5px #ddd6fe}
+.member-tab.active .member-avatar{box-shadow:0 0 0 1.5px #7c3aed}
+.member-tab-name{font-size:10px;font-weight:700;color:#374151;word-break:break-word;line-height:1.25;max-width:100%}
+.member-tab-lock{position:absolute;top:4px;right:8px;font-size:10px}
+.member-avatar-edit{position:absolute;top:32px;left:50%;transform:translateX(6px);width:18px;height:18px;border-radius:50%;background:#7c3aed;color:#fff;border:1.5px solid #fff;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
+.member-avatar-edit:hover{background:#6d28d9}
+.member-sidebar-empty{font-size:10.5px;color:#9ca3af;text-align:center;padding:10px 4px}
 .toolbar{display:none;flex-shrink:0;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
 .btn-toolbar{padding:7px 14px;border-radius:8px;border:1.5px dashed #c4b5fd;background:#faf5ff;color:#6d28d9;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
 .btn-toolbar:hover{background:#f2e8fe}
@@ -53,9 +79,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .btn-node-edit{background:#e0e7ff;color:#3730a3}
 .btn-node-connect{background:#d1fae5;color:#065f46}
 .btn-node-delete{background:#fee2e2;color:#991b1b}
-.member-heading{font-size:13px;font-weight:800;color:#1a1a2e;cursor:pointer;padding:4px 8px;border-radius:6px}
-.member-heading:hover{background:#f3f4f6}
-.member-heading::before{content:"👤 "}
+.board-badge{font-size:11px;font-weight:700;padding:4px 9px;border-radius:6px;white-space:nowrap}
+.board-badge.mine{background:#dcfce7;color:#166534}
+.board-badge.readonly{background:#fef3c7;color:#92400e}
+.board-badge.admin{background:#ede9fe;color:#6d28d9}
 
 /* ── Mind map canvas ── */
 #map-wrap{position:relative;display:flex;background:#f1f5fb;border-radius:14px 14px 0 0;overflow:hidden;flex:1 1 auto;min-height:300px}
@@ -141,20 +168,47 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 </head>
 <body>
 
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <div class="login-logo">🔬 Chakraborty Research Lab</div>
+    <div class="fg">
+      <label>Email</label>
+      <input type="email" id="login-email" autocomplete="username">
+    </div>
+    <div class="fg">
+      <label>Password</label>
+      <input type="password" id="login-password" autocomplete="current-password">
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <button class="btn btn-save" id="login-submit" onclick="handleLoginSubmit()" style="width:100%">Sign In</button>
+    <div class="login-hint">Don't have a login? Ask your lab admin to create one for you.</div>
+  </div>
+</div>
+
 <div class="hdr">
   <div class="hdr-logo">🔬 Chakraborty Research Lab</div>
   <div class="hdr-spacer"></div>
+  <span class="btn-hdr admin-badge" id="admin-badge" style="display:none">🔓 Admin</span>
+  <button class="btn-hdr" id="btn-manage-members" onclick="openMemberManager()" style="display:none">👥 Manage Members</button>
+  <button class="btn-hdr" id="btn-sign-out" onclick="handleSignOut()" style="display:none">🚪 Sign Out</button>
 </div>
 
 <div class="main">
+  <div class="member-sidebar" id="member-sidebar"></div>
+  <input type="file" id="avatar-file-input" accept="image/*" style="display:none" onchange="handleAvatarFile(event)">
+  <div class="main-content">
   <div class="toolbar" id="toolbar">
-    <span class="member-heading" id="member-heading" onclick="renameMemberPrompt()" title="Click to rename member"></span>
-    <button class="btn-shape shape-node" onclick="addNodeOfType('node')" title="Add a top-level node under the current project">● Node</button>
-    <button class="btn-shape shape-subnode" onclick="addNodeOfType('sub')" title="Add a child of the selected node">■ Sub Node</button>
-    <button class="btn-shape shape-subsubnode" onclick="addNodeOfType('subsub')" title="Add a grandchild of the selected node">◆ Sub Sub Node</button>
-    <button class="btn-toolbar" onclick="addProject()">+ Add Project</button>
+    <span class="board-badge" id="board-badge"></span>
+    <button class="btn-shape shape-node" id="btn-add-node" onclick="addNodeOfType('node')" title="Add a top-level node under the current project">● Node</button>
+    <button class="btn-shape shape-subnode" id="btn-add-sub" onclick="addNodeOfType('sub')" title="Add a child of the selected node">■ Sub Node</button>
+    <button class="btn-shape shape-subsubnode" id="btn-add-subsub" onclick="addNodeOfType('subsub')" title="Add a grandchild of the selected node">◆ Sub Sub Node</button>
+    <button class="btn-toolbar" id="btn-add-project" onclick="addProject()">+ Add Project</button>
+    <button class="btn-toolbar" id="btn-commit" onclick="commitMyBoard()" title="Lock in everything you've entered so far — you can still add new entries afterward" style="display:none">✅ Commit</button>
     <button class="btn-toolbar" id="btn-undo" onclick="undo()" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
     <button class="btn-toolbar" id="btn-redo" onclick="redo()" title="Redo (Ctrl+Y)" disabled>↷ Redo</button>
+    <button class="btn-toolbar" onclick="exportData()" title="Download everything as a .json backup file">⬇ Export</button>
+    <button class="btn-toolbar" onclick="triggerImport()" title="Load a previously exported .json backup (replaces everything currently saved here)">⬆ Import</button>
+    <input type="file" id="import-file-input" accept="application/json" style="display:none" onchange="handleImportFile(event)">
     <span class="toolbar-hint" id="toolbar-hint"></span>
     <div class="node-actions" id="node-actions">
       <button class="btn-node-action btn-node-edit" onclick="editSelectedNode()">✎ Edit</button>
@@ -176,6 +230,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
     <div class="map-controls">
       <button class="mc-btn" onclick="resetMapView()">Reset View</button>
     </div>
+  </div>
   </div>
 </div>
 
@@ -215,6 +270,18 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
   </div>
 </div>
 
+<!-- ── ADMIN: MANAGE MEMBERS ── -->
+<div class="overlay" id="ov-members">
+  <div class="modal">
+    <h3>👥 Manage Members</h3>
+    <div id="members-list" style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;margin-bottom:12px"></div>
+    <div style="font-size:11px;color:#9ca3af;line-height:1.5;margin-bottom:12px">New members: create their login in the <strong>Firebase Console</strong> (Authentication → Users → Add user). Their profile appears here automatically the first time they sign in.</div>
+    <div class="modal-footer">
+      <button class="btn btn-save" onclick="closeMemberManager()">Done</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── THREAD (CONNECTOR LINE) EDITOR ── -->
 <div id="thread-menu" class="thread-menu">
   <div class="thread-menu-row">
@@ -230,6 +297,51 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+
+<!-- The rest of the app is one big classic (non-module) script, since inline onclick="fn()"
+     handlers throughout the HTML need those functions as plain globals — ES modules don't
+     do that automatically. So Firebase loads in its own small module block below, which
+     explicitly hangs what the classic script needs onto window. This tiny synchronous script
+     runs first and defines the handshake promise before either script needs it. -->
+<script>
+window.firebaseReady = new Promise(res => { window.firebaseReadyResolve = res; });
+</script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+  import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, onSnapshot }
+    from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+    from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCVtvOIn6Nw5bcD-6sHk9D6JAncAUO8YcI",
+    authDomain: "chakraborty-lab-mindmaps.firebaseapp.com",
+    projectId: "chakraborty-lab-mindmaps",
+    storageBucket: "chakraborty-lab-mindmaps.firebasestorage.app",
+    messagingSenderId: "494899999265",
+    appId: "1:494899999265:web:e646adec36f76e00d7a960"
+  };
+  const fbApp = initializeApp(firebaseConfig);
+  const auth = getAuth(fbApp);
+  const db = getFirestore(fbApp);
+
+  window.fbSignIn = (email, pw) => signInWithEmailAndPassword(auth, email, pw);
+  window.fbSignOut = () => signOut(auth);
+  window.fbDoc = (...path) => doc(db, ...path);
+  window.fbSetDoc = (ref, data) => setDoc(ref, data);
+  window.fbGetDoc = (ref) => getDoc(ref);
+  window.fbDeleteDoc = (ref) => deleteDoc(ref);
+  window.fbCollection = (...path) => collection(db, ...path);
+  window.fbOnSnapshot = (ref, cb, errCb) => onSnapshot(ref, cb, errCb);
+
+  let firstAuthCheck = true;
+  onAuthStateChanged(auth, user => {
+    window.fbCurrentUser = user;
+    window.dispatchEvent(new CustomEvent('auth-changed', { detail: user }));
+    if (firstAuthCheck) { firstAuthCheck = false; window.firebaseReadyResolve(); }
+  });
+</script>
+
 <script>
 const PALETTE = ['#7c3aed','#0891b2','#d97706','#059669','#be185d','#2563eb','#ca8a04','#dc2626','#0d9488','#9333ea'];
 const DEFAULT_CONN_COLOR = '#8b5cf6';
@@ -252,7 +364,25 @@ const KIND_COLORS = {
   sub:    { fill: '#3b82f6', stroke: '#2563eb', text: '#ffffff' },
   subsub: { fill: '#f97316', stroke: '#ea580c', text: '#3d1a02' }
 };
-let data = JSON.parse(localStorage.getItem('crl_data') || 'null') || { members: [], activeId: null };
+let data = { members: [] };
+// ── IDENTITY & PERMISSIONS ──────────────────────────────────────────────
+// Identity now comes from a real Firebase login — myMemberId() is just the signed-in
+// user's UID. No more per-browser "pick your name," no more PIN: who you are and whether
+// you're admin are both real, server-known facts, not something a browser session invents.
+let viewMemberId = null;
+let isAdmin = false;
+let firebaseUser = null;
+const myMemberId = () => firebaseUser ? firebaseUser.uid : null;
+function isMyBoard() { return !!viewMemberId && viewMemberId === myMemberId(); }
+function canEditBoard() { return !!firebaseUser && (isAdmin || isMyBoard()); }
+// A node is locked once its owner has committed at or after it was created — admin bypasses
+// this entirely, per "admin has all the access to make any changes."
+function isNodeLocked(node) {
+  if (isAdmin || !node) return false;
+  const m = activeMember(); if (!m || !m.committedAt) return false;
+  return (node.createdAt || 0) <= m.committedAt;
+}
+function canEditNode(node) { return canEditBoard() && !isNodeLocked(node); }
 let nodeModalCallback = null;
 let mapRoot = null, mapZoom = null, mapSvgSel = null, mapInner = null, mapNodePositions = {}, mapNodeId = 0;
 let connectFromId = null, detailTopicId = null;
@@ -260,45 +390,98 @@ let obstacleCache = []; // every topic cell's rect, refreshed once per render �
 let undoStack = [], redoStack = [];
 const UNDO_LIMIT = 60;
 
+// ── FIRESTORE PERSISTENCE ────────────────────────────────────────────────
+// Each member's data is its own Firestore document (members/{uid}), so security rules can
+// enforce "you may only write your own document" on the server, not just in this JS. A
+// realtime listener on the whole collection keeps `data.members` current automatically —
+// no drive to map, no manual sync button, works from any signed-in computer anywhere.
 // Every mutation in the app already funnels through save() — hooking undo in here means
 // every add/edit/delete/drag/style change gets a history entry for free, with no need to
-// instrument each of the dozens of call sites individually.
+// instrument each of the dozens of call sites individually. Undo is per-member: it snapshots
+// whichever board save() just wrote, not the whole shared dataset.
 function save() {
-  try {
-    const prev = localStorage.getItem('crl_data');
-    if (prev) { undoStack.push(prev); if (undoStack.length > UNDO_LIMIT) undoStack.shift(); }
-    redoStack = [];
-    localStorage.setItem('crl_data', JSON.stringify(data));
-    updateUndoButtons();
+  const m = activeMember();
+  if (!m) { updateUndoButtons(); return; }
+  undoStack.push({ memberId: m.id, json: JSON.stringify(m) });
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  redoStack = [];
+  updateUndoButtons();
+  pushMemberToFirestore(m);
+}
+async function pushMemberToFirestore(m) {
+  try { await window.fbSetDoc(window.fbDoc('members', m.id), m); }
+  catch (e) {
+    console.error('Firestore write failed', e);
+    alert('Could not save to the shared database — check your connection. Your change is only visible on this screen right now.');
   }
-  catch (e) { alert('Storage is full — this browser only allows a few MB per site. Remove some attached images/files, or use smaller ones, then try again.'); }
+}
+// Used by admin actions on a member OTHER than the one currently on screen (renaming
+// someone from the sidebar, toggling their admin flag, etc.) — save() only ever writes
+// whichever board is actively being viewed/edited, so those need their own path.
+async function pushMemberPatch(memberId, patch) {
+  const m = data.members.find(x => x.id === memberId); if (!m) return;
+  Object.assign(m, patch);
+  await pushMemberToFirestore(m);
 }
 function updateUndoButtons() {
   const u = document.getElementById('btn-undo'); if (u) u.disabled = !undoStack.length;
   const r = document.getElementById('btn-redo'); if (r) r.disabled = !redoStack.length;
 }
-function loadSnapshot(json) {
-  data = JSON.parse(json);
-  if (!data.activeId && data.members.length) data.activeId = data.members[0].id;
-  closeDetail(); closeThreadMenu();
-  renderAll();
-  updateUndoButtons();
+// ── BACKUP / RESTORE — a manual safety net independent of the live database.
+function exportData() {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `chakraborty-lab-backup-${todayStr()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+function triggerImport() { document.getElementById('import-file-input').click(); }
+// Only ever imports into your OWN board — a shared backup can't blindly overwrite everyone
+// at once from the browser (security rules wouldn't allow it, and it'd be too easy to nuke
+// someone else's work by accident).
+function handleImportFile(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  if (!canEditBoard()) { alert('Sign in and select your own board before importing.'); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    let parsed;
+    try { parsed = JSON.parse(reader.result); }
+    catch (e) { alert('That file is not valid JSON.'); return; }
+    const incoming = Array.isArray(parsed.members) ? parsed.members[0] : parsed;
+    if (!incoming || !Array.isArray(incoming.topics)) { alert("That file doesn't look like a Chakraborty Lab backup."); return; }
+    if (!confirm('Import this backup into your own board? It will replace everything you currently have.')) return;
+    const m = activeMember();
+    const { id, ...rest } = incoming; // keep the real doc id (your UID), take everything else
+    Object.assign(m, rest);
+    save(); renderAll();
+  };
+  reader.readAsText(file);
 }
 function undo() {
   if (!undoStack.length) return;
-  const current = localStorage.getItem('crl_data');
-  if (current) redoStack.push(current);
-  const prev = undoStack.pop();
-  localStorage.setItem('crl_data', prev);
-  loadSnapshot(prev);
+  const entry = undoStack.pop();
+  const m = data.members.find(x => x.id === entry.memberId); if (!m) return;
+  redoStack.push({ memberId: entry.memberId, json: JSON.stringify(m) });
+  Object.assign(m, JSON.parse(entry.json));
+  updateUndoButtons();
+  pushMemberToFirestore(m);
+  renderAll();
 }
 function redo() {
   if (!redoStack.length) return;
-  const current = localStorage.getItem('crl_data');
-  if (current) undoStack.push(current);
-  const next = redoStack.pop();
-  localStorage.setItem('crl_data', next);
-  loadSnapshot(next);
+  const entry = redoStack.pop();
+  const m = data.members.find(x => x.id === entry.memberId); if (!m) return;
+  undoStack.push({ memberId: entry.memberId, json: JSON.stringify(m) });
+  Object.assign(m, JSON.parse(entry.json));
+  updateUndoButtons();
+  pushMemberToFirestore(m);
+  renderAll();
 }
 document.addEventListener('keydown', e => {
   const tag = (e.target.tagName || '').toLowerCase();
@@ -308,9 +491,76 @@ document.addEventListener('keydown', e => {
   if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
   else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
 });
+
+// ── AUTH ─────────────────────────────────────────────────────────────────
+let unsubscribeMembers = null;
+function showLoginScreen() {
+  document.getElementById('login-overlay').classList.add('open');
+  document.getElementById('login-error').classList.remove('show');
+}
+function hideLoginScreen() { document.getElementById('login-overlay').classList.remove('open'); }
+async function handleLoginSubmit() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-submit');
+  if (!email || !password) { errEl.textContent = 'Enter both email and password.'; errEl.classList.add('show'); return; }
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    await window.fbSignIn(email, password);
+    errEl.classList.remove('show');
+  } catch (e) {
+    errEl.textContent = 'Could not sign in — check your email and password.';
+    errEl.classList.add('show');
+  }
+  btn.disabled = false; btn.textContent = 'Sign In';
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const pw = document.getElementById('login-password');
+  if (pw) pw.addEventListener('keydown', e => { if (e.key === 'Enter') handleLoginSubmit(); });
+});
+function handleSignOut() { window.fbSignOut(); }
+// Fires on every sign-in/sign-out, and once immediately with whatever the current state is.
+async function handleAuthChange(user) {
+  firebaseUser = user;
+  if (unsubscribeMembers) { unsubscribeMembers(); unsubscribeMembers = null; }
+  if (!user) {
+    data.members = []; viewMemberId = null; isAdmin = false;
+    showLoginScreen();
+    renderAll();
+    return;
+  }
+  hideLoginScreen();
+  // First-ever login for this account — no profile doc yet, so create one.
+  const myRef = window.fbDoc('members', user.uid);
+  const snap = await window.fbGetDoc(myRef);
+  if (!snap.exists()) {
+    const name = (prompt('Welcome! What name should show for you in the lab map?') || user.email || 'New member').trim();
+    const fresh = newMemberRecord(name);
+    fresh.id = user.uid;
+    await window.fbSetDoc(myRef, fresh);
+  }
+  viewMemberId = user.uid;
+  unsubscribeMembers = window.fbOnSnapshot(window.fbCollection('members'), snapshot => {
+    data.members = snapshot.docs.map(d => d.data());
+    const me = data.members.find(x => x.id === myMemberId());
+    isAdmin = !!(me && me.isAdmin);
+    reconcileViewAfterDataChange();
+    renderAll();
+  }, err => console.error('members listener error', err));
+}
+window.addEventListener('auth-changed', e => handleAuthChange(e.detail));
+
 const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const activeMember = () => data.members.find(m => m.id === data.activeId) || null;
+const activeMember = () => data.members.find(m => m.id === viewMemberId) || null;
+// Called any time `data` gets swapped wholesale (Firestore snapshot/import) — the board you
+// were looking at might not exist in the new data, so fall back sensibly.
+function reconcileViewAfterDataChange() {
+  if (viewMemberId && data.members.some(m => m.id === viewMemberId)) return;
+  const mine = myMemberId();
+  viewMemberId = (mine && data.members.some(m => m.id === mine)) ? mine : (data.members[0] ? data.members[0].id : null);
+}
 const todayStr = () => new Date().toISOString().slice(0, 10);
 const initials = s => (s || '').slice(0, 2).toUpperCase();
 const truncate = (s, n) => (s && s.length > n) ? s.slice(0, n) + '…' : (s || '');
@@ -423,6 +673,7 @@ function migrateData() {
       delete m.weeks;
     }
     if (!m.connections) m.connections = [];
+    if (!('committedAt' in m)) m.committedAt = null;
     // Older connections were plain [a,b] pairs; upgrade to objects so each link can carry its own color.
     m.connections = m.connections.map(c => Array.isArray(c) ? { id: genId(), a: c[0], b: c[1], color: DEFAULT_CONN_COLOR } : c);
     if (!('lastTopicId' in m)) m.lastTopicId = null;
@@ -437,30 +688,75 @@ function migrateData() {
   });
 }
 
-// ── MEMBER ───────────────────────────────────────────────────────────────
-// The app is a single-workspace notebook now (no member switching UI) — if there's ever
-// no member on record (first run, or localStorage was cleared), silently provision one
-// instead of requiring a dedicated "Add Member" control.
-function ensureMember() {
-  if (data.members.length) return;
-  const name = (prompt('Your name:') || '').trim() || 'Lab Notebook';
+// ── MEMBERS & ADMIN ──────────────────────────────────────────────────────
+// Admin is a real per-account flag now (member.isAdmin, in Firestore), checked by security
+// rules on the server — not a client-side PIN anyone with dev tools could bypass.
+function newMemberRecord(name) {
   const projId = genId();
-  const m = { id: genId(), name, projects: [{ id: projId, name: 'New Project' }], lastProjectId: projId, color: PALETTE[0], topics: [], connections: [], lastTopicId: null };
-  data.members.push(m);
-  data.activeId = m.id;
-  save();
+  return { id: genId(), name, projects: [{ id: projId, name: 'New Project' }], lastProjectId: projId, color: PALETTE[data.members.length % PALETTE.length], topics: [], connections: [], lastTopicId: null, committedAt: null, isAdmin: false };
 }
-function renameMemberPrompt() {
-  const m = activeMember(); if (!m) return;
+function switchViewMember(id) {
+  if (!data.members.some(m => m.id === id)) return;
+  viewMemberId = id;
+  closeDetail();
+  buildD3Map();
+}
+function commitMyBoard() {
+  const m = activeMember(); if (!m || !isMyBoard()) return;
+  if (!confirm('Commit your current entries? Everything you have so far becomes read-only — you can still add brand-new entries afterward, just can\'t edit what\'s already here.')) return;
+  m.committedAt = Date.now();
+  save(); renderAll();
+}
+// ── ADMIN: MANAGE MEMBERS ───────────────────────────────────────────────
+function openMemberManager() {
+  renderMembersList();
+  document.getElementById('ov-members').classList.add('open');
+}
+function closeMemberManager() {
+  document.getElementById('ov-members').classList.remove('open');
+  renderAll();
+}
+function renderMembersList() {
+  const list = document.getElementById('members-list');
+  list.innerHTML = data.members.map(m => `
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid #e5e7eb;border-radius:8px">
+      <span style="flex:1;font-size:12px;font-weight:700">${escapeHtml(m.name)}${m.committedAt ? ' 🔒' : ''}${m.isAdmin ? ' 🔓' : ''}</span>
+      <button class="mc-btn" onclick="renameMemberAdmin('${m.id}')">Rename</button>
+      <button class="mc-btn" onclick="toggleMemberAdmin('${m.id}')">${m.isAdmin ? 'Remove admin' : 'Make admin'}</button>
+      ${m.committedAt ? `<button class="mc-btn" onclick="unlockMemberAdmin('${m.id}')">Unlock</button>` : ''}
+      <button class="mc-btn" onclick="removeMemberAdmin('${m.id}')" style="color:#991b1b">Remove</button>
+    </div>`).join('') || '<div style="font-size:12px;color:#9ca3af">No members yet.</div>';
+}
+function renameMemberAdmin(id) {
+  const m = data.members.find(x => x.id === id); if (!m) return;
   const v = prompt('Member name:', m.name);
   if (v === null || !v.trim()) return;
-  m.name = v.trim();
-  save(); renderAll();
+  pushMemberPatch(id, { name: v.trim() });
+  renderMembersList(); if (viewMemberId === id) renderAll();
+}
+function toggleMemberAdmin(id) {
+  const m = data.members.find(x => x.id === id); if (!m) return;
+  if (id === myMemberId() && m.isAdmin && !confirm('Remove your own admin access? You\'ll need another admin to grant it back.')) return;
+  pushMemberPatch(id, { isAdmin: !m.isAdmin });
+  renderMembersList();
+}
+async function removeMemberAdmin(id) {
+  const m = data.members.find(x => x.id === id); if (!m) return;
+  if (!confirm(`Remove "${m.name}"'s profile and all their data? This cannot be undone. (Their login stays valid — remove that separately in the Firebase Console if needed.)`)) return;
+  try { await window.fbDeleteDoc(window.fbDoc('members', id)); }
+  catch (e) { alert('Could not remove that member: ' + e.message); return; }
+  renderMembersList();
+}
+function unlockMemberAdmin(id) {
+  const m = data.members.find(x => x.id === id); if (!m) return;
+  if (!confirm(`Unlock "${m.name}"'s committed entries so they can edit again?`)) return;
+  pushMemberPatch(id, { committedAt: null });
+  renderMembersList(); if (viewMemberId === id) renderAll();
 }
 
 // ── PROJECTS (each member can run several independent projects, each its own root circle) ──
 function addProject() {
-  const m = activeMember(); if (!m) return;
+  const m = activeMember(); if (!m || !canEditBoard()) return;
   const name = prompt('Project name:', 'New Project');
   if (name === null || !name.trim()) return;
   const p = { id: genId(), name: name.trim() };
@@ -470,7 +766,7 @@ function addProject() {
   save(); buildD3Map();
 }
 function deleteProject(id) {
-  const m = activeMember(); if (!m) return;
+  const m = activeMember(); if (!m || !canEditBoard()) return;
   if (m.projects.length <= 1) { alert('A member must have at least one project.'); return; }
   const p = m.projects.find(x => x.id === id); if (!p) return;
   if (!confirm(`Delete project "${p.name}" and all its topics? This cannot be undone.`)) return;
@@ -559,7 +855,7 @@ const KIND_LABEL = { node: 'Node', sub: 'Sub Node', subsub: 'Sub Sub Node' };
 // only when nothing is selected does it fall back to the active project's root. 'kind' only
 // controls the new cell's shape/color; it never overrides where it connects from.
 function addNodeOfType(kind, presetDate) {
-  const m = activeMember(); if (!m) return;
+  const m = activeMember(); if (!m || !canEditBoard()) return;
   const label = KIND_LABEL[kind]; if (!label) return;
   const proj = m.projects.find(p => p.id === m.lastProjectId) || m.projects[0];
   const anchor = m.lastTopicId ? findNode(m, m.lastTopicId) : null;
@@ -574,9 +870,15 @@ function addNodeOfType(kind, presetDate) {
 }
 
 function renameNode(id) {
-  const m = activeMember(); const node = findNode(m, id); if (!node) return;
+  const m = activeMember(); const node = findNode(m, id); if (!node || !canEditNode(node)) return;
   openNodeModal('Edit Node', node.text, node.date, (text, dateVal) => {
+    const oldWeek = weekOfYear(node.date).absIdx;
     node.text = text; node.date = dateVal;
+    // manualX/manualY snapshot the cell's exact pixel slot from whenever it was last
+    // dragged — those pixels belong to its OLD week column. If the corrected date lands in
+    // a different week, that stale position has to be cleared (not just left stale) or the
+    // node keeps rendering in its old column regardless of what the date now says.
+    if (weekOfYear(node.date).absIdx !== oldWeek) { delete node.manualY; delete node.manualX; }
     save(); buildD3Map();
     if (detailTopicId === id) showTopicDetail(node);
   }, node);
@@ -585,7 +887,7 @@ function renameNode(id) {
 // changes; the tree position (who it's connected from and to) is untouched.
 function setNodeKind(id, kind) {
   if (!KIND_LABEL[kind]) return;
-  const node = findNode(activeMember(), id); if (!node || node.kind === kind) return;
+  const node = findNode(activeMember(), id); if (!node || node.kind === kind || !canEditNode(node)) return;
   node.kind = kind;
   save(); buildD3Map();
   if (detailTopicId === id) showTopicDetail(node);
@@ -598,6 +900,7 @@ function deleteNode(id) {
   const idx = arr.findIndex(n => n.id === id);
   if (idx === -1) return;
   const node = arr[idx];
+  if (!canEditNode(node)) return;
   const kids = node.children || [];
   const msg = kids.length
     ? `Delete "${node.text}"? Its ${kids.length} sub-node${kids.length !== 1 ? 's' : ''} will move up in its place.`
@@ -627,6 +930,7 @@ function findConnection(m, id) { return (m.connections || []).find(c => c.id ===
 
 // ── CONNECT MODAL ────────────────────────────────────────────────────────
 function openConnectModal(nodeId) {
+  if (!canEditBoard()) return;
   connectFromId = nodeId;
   document.getElementById('connect-search').value = '';
   renderConnectList();
@@ -655,6 +959,7 @@ function renderConnectList() {
   }).join('') || `<div style="padding:14px;text-align:center;color:#9ca3af;font-size:12px">No other topics yet.</div>`;
 }
 function toggleConnectRow(id) {
+  if (!canEditBoard()) return;
   const m = activeMember();
   const exists = m.connections.some(c => (c.a === connectFromId && c.b === id) || (c.a === id && c.b === connectFromId));
   if (exists) m.connections = m.connections.filter(c => !((c.a === connectFromId && c.b === id) || (c.a === id && c.b === connectFromId)));
@@ -681,15 +986,17 @@ function showRootDetail(m, projectId) {
   document.getElementById('detail-panel').classList.add('open');
   const count = countTopics(m.topics.filter(t => t.projectId === p.id));
   const canDelete = m.projects.length > 1;
+  const editable = canEditBoard();
   document.getElementById('detail-content').innerHTML = `
     <div class="d-title">${escapeHtml(p.name)}</div>
     <div class="d-date">👤 ${escapeHtml(m.name)} · ${count} topic${count !== 1 ? 's' : ''} total</div>
+    ${editable ? `
     <div class="d-section">Start a new branch</div>
     <div style="font-size:11px;color:rgba(255,255,255,.45);line-height:1.5;margin-bottom:4px">Adds a fresh top-level topic directly under this project, separate from any existing trail.</div>
     <div class="d-actions">
       <button class="d-btn add" onclick="addNodeOfType('node')">+ Add Node</button>
       ${canDelete ? `<button class="d-btn del" onclick="deleteProject('${p.id}')">✕ Delete Project</button>` : ''}
-    </div>`;
+    </div>` : `<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:6px">👀 Read-only — this isn't your board.</div>`}`;
   resizeMapForPanel();
 }
 function showTopicDetail(n) {
@@ -729,8 +1036,10 @@ function showTopicDetail(n) {
     html += `<div class="d-section">Connected to</div>`;
     conns.forEach(c => { html += `<span class="d-conn-chip" onclick="showTopicDetail(findNode(activeMember(),'${c.id}'))">${escapeHtml(truncate(c.text, 26))}</span>`; });
   }
+  if (!canEditBoard()) html += `<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:14px">👀 Read-only — this isn't your board.</div>`;
+  else if (isNodeLocked(n)) html += `<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:14px">🔒 Committed — locked from editing.</div>`;
   document.getElementById('detail-content').innerHTML = html;
-  document.getElementById('node-actions').classList.add('visible');
+  document.getElementById('node-actions').classList.toggle('visible', canEditNode(n));
   resizeMapForPanel();
 }
 
@@ -745,20 +1054,36 @@ function sundayOf(date) {
   return d;
 }
 function yearSunday(year) { return sundayOf(new Date(year, 0, 1)); }
-function weekIndexToDates(year, idx) {
-  const weekStart = new Date(yearSunday(year));
-  weekStart.setDate(weekStart.getDate() + idx * 7);
+// Columns are laid out on one continuous week index that never resets at a year boundary.
+// The old version indexed each date by its "week of its own year" and just clamped that
+// into the currently-displayed year's range — so a date in a different year (week index
+// back near 0) collapsed into an early column instead of extending the timeline, making a
+// next-year entry appear to land *before* everything else. absWeekIndex fixes that by
+// counting weeks from a fixed epoch instead of from each year's own January.
+const WEEK_EPOCH = sundayOf(new Date(2000, 0, 1));
+function absWeekIndex(date) { return Math.round((sundayOf(date) - WEEK_EPOCH) / 604800000); }
+function weekIndexToDates(absIdx) {
+  const weekStart = new Date(WEEK_EPOCH);
+  weekStart.setDate(weekStart.getDate() + absIdx * 7);
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
   return { weekStart, weekEnd };
 }
+// weekNum here is still "week number within its own calendar year" (for the "Week 33"
+// label) — only the column layout itself needs to be year-agnostic, not the display.
 function weekOfYear(dateStr) {
   const d = new Date((dateStr || todayStr()) + 'T00:00:00');
   const sunday = sundayOf(d);
   const year = sunday.getFullYear();
-  const weekIndex = Math.round((sunday - yearSunday(year)) / 604800000);
+  const weekNum = Math.round((sunday - yearSunday(year)) / 604800000) + 1;
   const weekEnd = new Date(sunday); weekEnd.setDate(sunday.getDate() + 6);
-  return { year, weekIndex, weekNum: weekIndex + 1, weekStart: sunday, weekEnd };
+  return { year, absIdx: absWeekIndex(d), weekNum, weekStart: sunday, weekEnd };
+}
+function weekColumnLabel(absIdx) {
+  const { weekStart } = weekIndexToDates(absIdx);
+  const year = weekStart.getFullYear();
+  const weekNum = Math.round((weekStart - yearSunday(year)) / 604800000) + 1;
+  return `Week ${weekNum}, ${year}`;
 }
 function formatWeekRange(ws, we) {
   const sameMonth = ws.getMonth() === we.getMonth();
@@ -769,14 +1094,11 @@ function formatWeekRange(ws, we) {
 function computeWeekRange(m) {
   const flat = allTopicNodes(m.topics, []);
   const now = weekOfYear(todayStr());
-  if (!flat.length) return { year: now.year, minIdx: Math.max(0, now.weekIndex - 1), maxIdx: now.weekIndex + 2 };
-  const infos = flat.map(t => weekOfYear(t.date));
-  const year = infos[0].year;
-  const idxs = infos.filter(w => w.year === year).map(w => w.weekIndex);
-  if (!idxs.length) return { year, minIdx: Math.max(0, now.weekIndex - 1), maxIdx: now.weekIndex + 2 };
+  if (!flat.length) return { minIdx: Math.max(0, now.absIdx - 1), maxIdx: now.absIdx + 2 };
+  const idxs = flat.map(t => weekOfYear(t.date).absIdx);
   const minIdx = Math.max(0, Math.min(...idxs) - 1);
   const maxIdx = Math.max(...idxs) + 1;
-  return { year, minIdx, maxIdx };
+  return { minIdx, maxIdx };
 }
 
 // ── TREE DATA (root -> topics -> sub-topics only; weeks are a background, not a node) ──
@@ -794,11 +1116,80 @@ function buildTree(m) {
     })
   };
 }
+// Header controls (Admin badge/Manage Members/Sign Out) live outside the per-board toolbar
+// so they stay reachable even before any member exists — this must not depend on activeMember().
+function updateHeaderControls() {
+  document.getElementById('admin-badge').style.display = isAdmin ? '' : 'none';
+  document.getElementById('btn-manage-members').style.display = isAdmin ? '' : 'none';
+  document.getElementById('btn-sign-out').style.display = firebaseUser ? '' : 'none';
+  renderMemberSidebar();
+}
+// Vertical tab strip on the left — one entry per member, with their avatar (or initials as
+// a fallback) and a 📷 button on tabs you're allowed to re-picture (your own, or any of
+// them if you're admin).
+function renderMemberSidebar() {
+  const sidebar = document.getElementById('member-sidebar');
+  if (!sidebar) return;
+  sidebar.innerHTML = data.members.map(mm => {
+    const canPic = isAdmin || mm.id === myMemberId();
+    const avatarStyle = mm.avatar ? `background-image:url('${mm.avatar}')` : '';
+    return `<div class="member-tab${mm.id === viewMemberId ? ' active' : ''}" onclick="switchViewMember('${mm.id}')" title="${escapeHtml(mm.name)}${mm.id === myMemberId() ? ' (me)' : ''}">
+      <div class="member-avatar" style="${avatarStyle}">${mm.avatar ? '' : escapeHtml(initials(mm.name))}</div>
+      <span class="member-tab-name">${escapeHtml(truncate(mm.name, 12))}</span>
+      ${mm.committedAt ? '<span class="member-tab-lock">🔒</span>' : ''}
+      ${canPic ? `<button class="member-avatar-edit" onclick="event.stopPropagation(); changeAvatar('${mm.id}')" title="Change profile picture">📷</button>` : ''}
+    </div>`;
+  }).join('') || '<div class="member-sidebar-empty">No members yet</div>';
+}
+let avatarTargetId = null;
+function changeAvatar(id) {
+  if (!(isAdmin || id === myMemberId())) return;
+  avatarTargetId = id;
+  document.getElementById('avatar-file-input').click();
+}
+function handleAvatarFile(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  const targetId = avatarTargetId; avatarTargetId = null;
+  if (!file || !targetId) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      // Downscale to a small square so avatars stay a few KB each — well within Firestore's
+      // per-document size limit, and quick to sync to every computer on every save.
+      const size = 96;
+      const canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const scale = Math.max(size / img.width, size / img.height);
+      const w = img.width * scale, h = img.height * scale;
+      ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+      pushMemberPatch(targetId, { avatar: canvas.toDataURL('image/jpeg', 0.82) });
+      renderMemberSidebar();
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
 function updateToolbarHint() {
   const m = activeMember(); if (!m) return;
-  document.getElementById('member-heading').textContent = m.name;
+  const editable = canEditBoard();
+
+  const badge = document.getElementById('board-badge');
+  if (isAdmin) { badge.textContent = '🔓 Admin — full access'; badge.className = 'board-badge admin'; }
+  else if (isMyBoard()) { badge.textContent = m.committedAt ? '🔒 Your board — committed (new entries still OK)' : '✏️ Your board'; badge.className = 'board-badge mine'; }
+  else { badge.textContent = '👀 Read-only'; badge.className = 'board-badge readonly'; }
+
+  ['btn-add-node', 'btn-add-sub', 'btn-add-subsub', 'btn-add-project'].forEach(id => {
+    document.getElementById(id).disabled = !editable;
+  });
+  document.getElementById('btn-commit').style.display = (isMyBoard() && !isAdmin) ? '' : 'none';
+
   const el = document.getElementById('toolbar-hint');
-  if (m.lastTopicId) {
+  if (!editable) {
+    el.textContent = '';
+  } else if (m.lastTopicId) {
     const n = findNode(m, m.lastTopicId);
     el.textContent = n ? `Continuing from "${truncate(n.text, 30)}" — click any node to change` : '';
   } else {
@@ -809,6 +1200,7 @@ function updateToolbarHint() {
 
 // ── D3 MIND MAP ──────────────────────────────────────────────────────────
 function buildD3Map() {
+  updateHeaderControls();
   const m = activeMember();
   const svgEl = document.getElementById('map-svg');
   const emptyEl = document.getElementById('map-empty');
@@ -861,9 +1253,9 @@ function mapUpdate(source) {
   const colWidths = [];
   for (let c = 0; c < totalCols; c++) {
     const idx = range.minIdx + c;
-    const { weekStart: hdrStart, weekEnd: hdrEnd } = weekIndexToDates(range.year, idx);
+    const { weekStart: hdrStart, weekEnd: hdrEnd } = weekIndexToDates(idx);
     const headerW = Math.max(
-      measureTextWidth(`Week ${idx + 1}`, "800 11px 'Segoe UI', system-ui, sans-serif"),
+      measureTextWidth(weekColumnLabel(idx), "800 11px 'Segoe UI', system-ui, sans-serif"),
       measureTextWidth(formatWeekRange(hdrStart, hdrEnd), "9.5px 'Segoe UI', system-ui, sans-serif")
     );
     colWidths[c] = Math.max(minBandWidth, headerW + 30);
@@ -887,7 +1279,7 @@ function mapUpdate(source) {
   nodes.forEach(d => {
     if (d.data.type === 'root') return;
     const wk = weekOfYear(d.data.date);
-    const idx = Math.min(range.maxIdx, Math.max(range.minIdx, wk.weekIndex));
+    const idx = Math.min(range.maxIdx, Math.max(range.minIdx, wk.absIdx));
     const col = idx - range.minIdx;
     const fullWidth = colWidths[col] - colInset - colRightMargin;
     const ref = d.data.nodeRef;
@@ -984,7 +1376,7 @@ function mapUpdate(source) {
   bandsLayer.selectAll('*').remove();
   for (let c = 0; c < totalCols; c++) {
     const idx = range.minIdx + c;
-    const { weekStart: wStart, weekEnd: wEnd } = weekIndexToDates(range.year, idx);
+    const { weekStart: wStart, weekEnd: wEnd } = weekIndexToDates(idx);
     const bx = colX[c], bw = colWidths[c];
     const band = WEEK_BAND_COLORS[c % WEEK_BAND_COLORS.length];
     bandsLayer.append('rect')
@@ -999,7 +1391,7 @@ function mapUpdate(source) {
       .attr('stroke', band.border).attr('stroke-opacity', 0.55).attr('stroke-width', 1);
     bandsLayer.append('text').attr('x', bx + bw / 2).attr('y', 23).attr('text-anchor', 'middle')
       .attr('font-size', '13.5').attr('font-weight', '800').attr('fill', '#1e293b')
-      .text(`Week ${idx + 1}`);
+      .text(weekColumnLabel(idx));
     bandsLayer.append('text').attr('x', bx + bw / 2).attr('y', 36).attr('text-anchor', 'middle')
       .attr('font-size', '9.5').attr('fill', 'rgba(30,41,59,.55)')
       .text(formatWeekRange(wStart, wEnd));
@@ -1164,7 +1556,9 @@ function mapUpdate(source) {
   const dragHandle = tE.append('g').attr('class', 'drag-handle').style('cursor', 'ns-resize').call(topicDragBehavior())
     .on('dblclick', function (event, d) {
       event.stopPropagation();
-      const ref = d.data.nodeRef; if (!ref) return;
+      // Repositioning stays allowed even on a committed (locked) node — only its content
+      // (text/date/kind/bullets/deletion) is frozen by a commit, per design.
+      const ref = d.data.nodeRef; if (!ref || !canEditBoard()) return;
       delete ref.manualY; delete ref.manualX;
       save(); buildD3Map();
     });
@@ -1182,6 +1576,7 @@ function mapUpdate(source) {
     .style('pointer-events', 'none').style('user-select', 'none').text('▼');
   dragHandle.append('title').text("Drag up/down to reposition within this cell's week · double-click to reset to automatic placement");
   tE.append('circle').attr('class', 'has-content-dot').attr('r', 3.5).attr('fill', '#4f46e5').attr('stroke', '#fff').attr('stroke-width', 1).style('display', 'none');
+  tE.append('text').attr('class', 'lock-badge').attr('font-size', 11).style('pointer-events', 'none').style('display', 'none').text('🔒');
   tE.append('foreignObject').attr('class', 'desc-card').attr('width', 220).attr('height', 190).attr('y', -20).style('display', 'none')
     .on('mouseenter', () => cancelHideHoverCard())
     .on('mouseleave', () => scheduleHideHoverCard());
@@ -1207,6 +1602,13 @@ function mapUpdate(source) {
     g.select('.has-content-dot').attr('cx', d.cellWidth).attr('cy', -d.cellHeight / 2)
       .style('display', hasBulletContent(n) ? 'block' : 'none');
     g.select('.desc-card').attr('x', d.cellWidth + 10);
+
+    // Committed (locked) nodes keep their full color and stay draggable — only content
+    // editing (text/date/kind/bullets/delete) is frozen, so the lock badge alone marks it.
+    g.select('.editable-label').style('cursor', canEditNode(n) ? 'text' : 'default');
+    g.select('.drag-handle').style('display', canEditBoard() ? null : 'none');
+    g.select('.lock-badge').attr('x', -12).attr('y', -d.cellHeight / 2 + 3)
+      .style('display', isNodeLocked(n) ? 'block' : 'none');
   });
   node.exit().transition().duration(duration).style('opacity', 0)
     .attr('transform', () => `translate(${source.y},${source.x})`).remove();
@@ -1352,13 +1754,16 @@ function wrapText(text, maxWidth, font) {
 // Only ever adjusts the cell's row (d.x) — its column (d.y) is derived from its date and
 // is never touched here, so the entry can never leave its own week.
 function topicDragBehavior() {
-  let curX;
+  let curX, dragAllowed;
   return d3.drag()
     .on('start', function (event, d) {
       event.sourceEvent.stopPropagation();
+      // Repositioning is exempt from the commit lock — only content edits are frozen.
+      dragAllowed = canEditBoard();
       curX = d.x;
     })
     .on('drag', function (event, d) {
+      if (!dragAllowed) return;
       curX += event.dy;
       d.x = curX;
       d3.select(this.parentNode).attr('transform', `translate(${d.y},${curX})`);
@@ -1391,6 +1796,7 @@ function topicDragBehavior() {
       });
     })
     .on('end', function (event, d) {
+      if (!dragAllowed) return;
       d.data.nodeRef.manualY = curX;
       d.data.nodeRef.manualX = d.y; // preserve its current left/right slot — this drag only ever moved it vertically
       save();
@@ -1549,29 +1955,31 @@ function applyWordCap(el, max) {
     el.setSelectionRange(newPos, newPos);
   }
 }
-function buildDescCardHtml(n) {
+function buildDescCardHtml(n, editable) {
   const bullets = n.bullets || [];
   const rows = bullets.map((b, i) => `
       <div class="bullet-row">
         <span class="bullet-mark">🙂</span>
-        <textarea class="bullet-textarea" data-idx="${i}" rows="1" placeholder="Type a point…" title="Max ${BULLET_MAX_WORDS} words">${escapeHtml(b)}</textarea>
-        <span class="bullet-remove" data-idx="${i}" title="Remove this point">✕</span>
-      </div>`).join('');
+        <textarea class="bullet-textarea" data-idx="${i}" rows="1" placeholder="Type a point…" title="Max ${BULLET_MAX_WORDS} words"${editable ? '' : ' readonly'}>${escapeHtml(b)}</textarea>
+        ${editable ? `<span class="bullet-remove" data-idx="${i}" title="Remove this point">✕</span>` : ''}
+      </div>`).join('') || (editable ? '' : '<div class="bullet-hint" style="text-align:left">No points yet.</div>');
   return `<div class="desc-card-inner" xmlns="http://www.w3.org/1999/xhtml">
       <div class="bullet-list">${rows}</div>
-      <button class="bullet-add" type="button">+ Add 🙂</button>
-      <div class="bullet-hint">Max ${BULLET_MAX_WORDS} words per point</div>
+      ${editable ? `<button class="bullet-add" type="button">+ Add 🙂</button>
+      <div class="bullet-hint">Max ${BULLET_MAX_WORDS} words per point</div>` : `<div class="bullet-hint">👀 Read-only</div>`}
     </div>`;
 }
 // Hovering a topic reveals its bullet-point popup next to it, and hovering into the popup
 // itself (instead of just the cell) keeps it open so it stays editable.
 let hoverCardNodeId = null, hoverHideTimer = null;
 function wireDescCard(fo, n, d, g) {
-  fo.html(buildDescCardHtml(n));
+  const editable = canEditNode(n);
+  fo.html(buildDescCardHtml(n, editable));
   const inner = fo.select('.desc-card-inner');
   inner.on('mousedown', e => e.stopPropagation());
   inner.on('click', e => e.stopPropagation());
   fo.selectAll('.bullet-textarea').each(function () { autoGrowTextarea(this); });
+  if (!editable) return;
   fo.selectAll('.bullet-textarea')
     .on('input', function () {
       applyWordCap(this, BULLET_MAX_WORDS);
@@ -1622,6 +2030,8 @@ function cancelHideHoverCard() { clearTimeout(hoverHideTimer); }
 // ── CLICK-TO-EDIT NODE TEXT ───────────────────────────────────────────────
 function editNodeName(event, d, gSel) {
   event.stopPropagation();
+  if (d.data.type === 'root' && !canEditBoard()) return;
+  if (d.data.type === 'topic' && !canEditNode(d.data.nodeRef)) return;
   d3.selectAll('.inline-edit-fo').remove();
   setAnchor(d);
 
@@ -1680,6 +2090,9 @@ function isAnchor(d, m) {
   return !!d.data.nodeRef && d.data.nodeRef.id === m.lastTopicId;
 }
 function setAnchor(d) {
+  // Merely viewing (read-only) another member's board should never mutate their "continuing
+  // from" state — only actually move the anchor when this is a board you can edit.
+  if (!canEditBoard()) return;
   const m = activeMember(); if (!m) return;
   if (d.data.type === 'root') { m.lastProjectId = d.data.projectId; m.lastTopicId = null; }
   else { m.lastTopicId = d.data.nodeRef ? d.data.nodeRef.id : null; }
@@ -1698,9 +2111,14 @@ function resetMapView() {
 window.addEventListener('resize', () => buildD3Map());
 
 // ── INIT ─────────────────────────────────────────────────────────────────
-ensureMember();
-if (!data.activeId && data.members.length) data.activeId = data.members[0].id;
-renderAll();
+// Wait for the Firebase module script to report the first auth check has completed, then
+// handleAuthChange (already listening via the 'auth-changed' event) takes it from there —
+// showing the login screen or loading the signed-in user's data as appropriate.
+showLoginScreen();
+(async function initApp() {
+  await window.firebaseReady;
+  handleAuthChange(window.fbCurrentUser);
+})();
 </script>
 </body>
 </html>

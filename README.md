@@ -1,16 +1,17 @@
 # Chakraborty Research Lab — Mind Map Guide
 
-A single-file, self-contained lab notebook. No install, no server, no account —
-just a `.html` file that saves your data in the browser it's opened in.
+A shared lab notebook, live for everyone in the lab. Sign in with your account
+and your entries sync instantly to every other computer — no drive to map, no
+manual sync step.
 
-## 1. Opening it
+## 1. Signing in
 
-Double-click `chakraborty-lab-mindmap.html` to open it in your default browser,
-or drag it into an open browser window.
+Open the site's URL and sign in with the email and password your admin set up
+for you. Don't have a login? Ask your admin — new logins are created for you,
+not self-registered.
 
-> **First run:** the browser will ask for your name once (a plain browser
-> prompt). This sets up your single workspace — there's no separate "Add
-> Member" step.
+The very first time you sign in, you'll be asked what name should show for
+you in the lab map — that's the only setup step.
 
 ## 2. The layout
 
@@ -20,8 +21,17 @@ or drag it into an open browser window.
   name in bold beside it and how many topics it holds underneath.
 - Every entry (node) sits in the week column that matches its date, and
   connects back to whatever it was added under with a curved line.
+- The **left sidebar** lists every lab member as a tab, with their photo (or
+  initials). Click a tab to view that person's board.
 
-## 3. Adding entries
+## 3. Whose board you're looking at
+
+- **Your own board** — fully editable.
+- **Someone else's board** — read-only. You can look, but every edit control
+  is disabled.
+- **Admins** can edit anyone's board, including committed/locked entries.
+
+## 4. Adding entries
 
 Three shapes are available from the toolbar, each a different "depth":
 
@@ -43,7 +53,7 @@ Three shapes are available from the toolbar, each a different "depth":
 A popup asks for the entry's **text (max 5 words)** and **date** — the date
 decides which week column it lands in.
 
-## 4. Editing
+## 5. Editing
 
 - **Rename:** click directly on a node's text on the map, type, and press
   Enter (or click away) to save. Esc cancels.
@@ -56,7 +66,7 @@ decides which week column it lands in.
   place, reconnecting to whatever came before it. Nothing "downstream" is
   lost.
 
-## 5. Adding descriptions
+## 6. Adding descriptions
 
 Hover any node to reveal a popup with 🙂-marked points. Type in a box, click
 **+ Add 🙂** for another, or ✕ to remove one — each point is capped at 20
@@ -64,43 +74,67 @@ words. Click a node (rather than hover) to see the same points numbered in
 the right-hand detail panel, along with its date, week, creation time, and
 what it's connected to.
 
-## 6. Repositioning
+## 7. Repositioning
 
 Each node has a small 🙂 grip (with ▲/▼ arrows) on its left edge — drag it
 up or down to nudge the node within its own week column. Double-click the
-grip to snap it back to automatic placement.
+grip to snap it back to automatic placement. This still works even after
+your entries are committed — only the content itself locks, not its position.
 
-## 7. Connecting nodes across the map
+## 8. Connecting nodes across the map
 
 Select a node, click 🔗 **Connect**, and search for another topic to link to
 it (a dashed cross-topic line, independent of the tree structure). Click any
 line on the map — tree or cross-connection — to change its color/style or
 (for cross-connections) remove it.
 
-## 8. Projects
+## 9. Projects
 
 **+ Add Project** starts a second independent trail with its own 🙂 marker.
 Click a project's 🙂/name and use the panel's **+ Add Node** / **✕ Delete
 Project** actions.
 
-## 9. Undo / Redo
+## 10. Committing your work
+
+Click **✅ Commit** to lock in everything you've entered so far — it becomes
+read-only (marked with a 🔒 badge), protecting it from later accidental
+edits. You can still add brand-new entries afterward; they stay editable
+until your next commit. An admin can unlock a commit for you if you need to
+go back and fix something.
+
+## 11. Profile pictures
+
+Click the small 📷 button on your own tab in the sidebar to set a profile
+picture. Admins can set anyone's.
+
+## 12. Undo / Redo
 
 Every change is tracked — use the toolbar buttons or `Ctrl+Z` / `Ctrl+Y`
-(`Ctrl+Shift+Z` also works for redo).
+(`Ctrl+Shift+Z` also works for redo). Undo is per-member, tied to whichever
+board you were just editing.
 
-## 10. Your data
+## 13. Your data
 
-Everything is saved to the browser's **localStorage**, tied to this specific
-file and browser:
+Everything is stored live in the lab's shared database and synced instantly
+to every signed-in computer — there's no local file, no drive to map, and no
+manual sync step. Only signed-in lab members can read or write anything; the
+permission rules are enforced on the server, not just in this page.
 
-- It **won't sync** across different browsers or computers.
-- Clearing that browser's site data/history will erase it.
-- There's currently no built-in export/backup — if you want a safety copy,
-  ask for that feature and it can be added.
+Use **⬇ Export** any time to download your own board as a `.json` backup.
+**⬆ Import** restores a backup into your own board (never someone else's).
+
+## For admins
+
+- **👥 Manage Members** (top right, visible only to admins) lets you rename a
+  member, promote/demote other admins, unlock a commit, or remove a member's
+  profile.
+- New logins are created in the Firebase Console (Authentication → Users),
+  not from inside the app — a member's profile then appears automatically
+  the first time they sign in.
 
 ## Tips
 
 - If the map looks empty or you want to reset the camera, click **Reset
   View** in the bottom-right corner.
-- Multiple browser tabs open on the same file share the same saved data —
-  edits in one won't appear in another until you reload it.
+- Changes from other members can appear while you're looking at their board
+  — that's expected, it's live.
