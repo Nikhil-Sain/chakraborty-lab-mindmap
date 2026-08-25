@@ -319,7 +319,7 @@ window.firebaseReady = new Promise(res => { window.firebaseReadyResolve = res; }
   import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, onSnapshot }
     from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
-            createUserWithEmailAndPassword, sendPasswordResetEmail }
+            createUserWithEmailAndPassword, sendPasswordResetEmail, deleteUser }
     from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
 
   const firebaseConfig = {
@@ -347,15 +347,22 @@ window.firebaseReady = new Promise(res => { window.firebaseReadyResolve = res; }
   window.fbDeleteDoc = (ref) => deleteDoc(ref);
   window.fbCollection = (...path) => collection(db, ...path);
   window.fbOnSnapshot = (ref, cb, errCb) => onSnapshot(ref, cb, errCb);
-  // Creates the login itself (nobody, including the admin, ever sees the throwaway password
-  // — the new member sets their own via the reset email that follows) and returns their UID.
+  // Split into three steps (rather than one create-and-done call) so a failure creating the
+  // Firestore profile doesn't leave an orphaned login behind: the caller creates the account,
+  // writes the profile doc, then either finishes (send the reset email) or aborts (delete the
+  // just-created account) depending on whether that write actually succeeded.
   window.fbCreateMemberAccount = async (email) => {
     const throwawayPw = crypto.randomUUID();
     const cred = await createUserWithEmailAndPassword(secondaryAuth, email, throwawayPw);
-    const uid = cred.user.uid;
+    return cred.user; // still signed in on the secondary instance at this point
+  };
+  window.fbFinishMemberAccount = async (email) => {
     await signOut(secondaryAuth);
     await sendPasswordResetEmail(auth, email);
-    return uid;
+  };
+  window.fbAbortMemberAccount = async (user) => {
+    try { await deleteUser(user); } catch (e) { /* best effort */ }
+    try { await signOut(secondaryAuth); } catch (e) { /* best effort */ }
   };
 
   let firstAuthCheck = true;
@@ -765,15 +772,20 @@ async function addMemberAccount() {
   if (!email || !name) { alert('Enter both an email and a name.'); return; }
   const btn = document.getElementById('btn-create-member');
   btn.disabled = true; btn.textContent = 'Creating…';
+  let newUser = null;
   try {
-    const uid = await window.fbCreateMemberAccount(email);
+    newUser = await window.fbCreateMemberAccount(email);
     const fresh = newMemberRecord(name);
-    fresh.id = uid;
-    await window.fbSetDoc(window.fbDoc('members', uid), fresh);
+    fresh.id = newUser.uid;
+    await window.fbSetDoc(window.fbDoc('members', newUser.uid), fresh);
+    await window.fbFinishMemberAccount(email);
     emailEl.value = ''; nameEl.value = '';
     alert(`Account created for ${name}. They'll get an email at ${email} to set their password.`);
     renderMembersList();
   } catch (e) {
+    // If the login was created but the profile write failed (e.g. a permissions error), don't
+    // leave a dangling account behind — undo the account creation so the admin can just retry.
+    if (newUser) await window.fbAbortMemberAccount(newUser);
     let msg = 'Could not create that account: ' + e.message;
     if (e.code === 'auth/email-already-in-use') msg = 'That email already has an account.';
     else if (e.code === 'auth/invalid-email') msg = "That doesn't look like a valid email.";
