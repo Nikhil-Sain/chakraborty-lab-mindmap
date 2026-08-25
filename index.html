@@ -1840,14 +1840,26 @@ function wrapText(text, maxWidth, font) {
   const words = String(text || '').split(/\s+/).filter(Boolean);
   if (!words.length) return [''];
   const lines = [];
-  let current = words[0];
-  for (let i = 1; i < words.length; i++) {
-    const test = current + ' ' + words[i];
-    if (measureTextWidth(test, font) > maxWidth) { lines.push(current); current = words[i]; }
-    else current = test;
-  }
-  lines.push(current);
-  return lines;
+  let current = '';
+  const flush = () => { if (current) { lines.push(current); current = ''; } };
+  words.forEach(word => {
+    const withWord = current ? current + ' ' + word : word;
+    if (measureTextWidth(withWord, font) <= maxWidth) { current = withWord; return; }
+    flush();
+    if (measureTextWidth(word, font) <= maxWidth) { current = word; return; }
+    // The word alone is still wider than the box (a long technical term, a narrow Sub
+    // Node/Micro Node cell, etc.) — word-boundary wrapping alone can't help here, so force-
+    // break it character by character instead of letting it overflow the cell regardless.
+    let piece = '';
+    for (const ch of word) {
+      const test = piece + ch;
+      if (piece && measureTextWidth(test, font) > maxWidth) { lines.push(piece); piece = ch; }
+      else piece = test;
+    }
+    current = piece;
+  });
+  flush();
+  return lines.length ? lines : [''];
 }
 
 // ── DRAG A CELL VERTICALLY WITHIN ITS OWN WEEK COLUMN ─────────────────────
