@@ -274,8 +274,16 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 <div class="overlay" id="ov-members">
   <div class="modal">
     <h3>👥 Manage Members</h3>
-    <div id="members-list" style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;margin-bottom:12px"></div>
-    <div style="font-size:11px;color:#9ca3af;line-height:1.5;margin-bottom:12px">New members: create their login in the <strong>Firebase Console</strong> (Authentication → Users → Add user). Their profile appears here automatically the first time they sign in.</div>
+    <div id="members-list" style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;margin-bottom:14px"></div>
+    <div class="fg">
+      <label>Add a new member</label>
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <input id="new-member-email" type="email" placeholder="Email" style="flex:1;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:7px;font-size:13px;font-family:inherit">
+        <input id="new-member-display-name" type="text" placeholder="Name" style="flex:1;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:7px;font-size:13px;font-family:inherit">
+      </div>
+      <button class="btn btn-save" id="btn-create-member" onclick="addMemberAccount()" style="width:100%">Create Account</button>
+      <div style="font-size:10px;color:#9ca3af;margin-top:6px">They'll get an email to set their own password — nobody, including you, ever sees it.</div>
+    </div>
     <div class="modal-footer">
       <button class="btn btn-save" onclick="closeMemberManager()">Done</button>
     </div>
@@ -310,7 +318,8 @@ window.firebaseReady = new Promise(res => { window.firebaseReadyResolve = res; }
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
   import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, onSnapshot }
     from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
-  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
+            createUserWithEmailAndPassword, sendPasswordResetEmail }
     from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
 
   const firebaseConfig = {
@@ -324,6 +333,11 @@ window.firebaseReady = new Promise(res => { window.firebaseReadyResolve = res; }
   const fbApp = initializeApp(firebaseConfig);
   const auth = getAuth(fbApp);
   const db = getFirestore(fbApp);
+  // A second, independent Auth instance used only for creating new logins. Firebase's client
+  // SDK signs in as whatever account it just created — using a throwaway secondary app keeps
+  // that sign-in isolated there, so the admin's real session on `auth` never gets touched.
+  const secondaryApp = initializeApp(firebaseConfig, "Secondary");
+  const secondaryAuth = getAuth(secondaryApp);
 
   window.fbSignIn = (email, pw) => signInWithEmailAndPassword(auth, email, pw);
   window.fbSignOut = () => signOut(auth);
@@ -333,6 +347,16 @@ window.firebaseReady = new Promise(res => { window.firebaseReadyResolve = res; }
   window.fbDeleteDoc = (ref) => deleteDoc(ref);
   window.fbCollection = (...path) => collection(db, ...path);
   window.fbOnSnapshot = (ref, cb, errCb) => onSnapshot(ref, cb, errCb);
+  // Creates the login itself (nobody, including the admin, ever sees the throwaway password
+  // — the new member sets their own via the reset email that follows) and returns their UID.
+  window.fbCreateMemberAccount = async (email) => {
+    const throwawayPw = crypto.randomUUID();
+    const cred = await createUserWithEmailAndPassword(secondaryAuth, email, throwawayPw);
+    const uid = cred.user.uid;
+    await signOut(secondaryAuth);
+    await sendPasswordResetEmail(auth, email);
+    return uid;
+  };
 
   let firstAuthCheck = true;
   onAuthStateChanged(auth, user => {
@@ -728,6 +752,34 @@ function renderMembersList() {
       ${m.committedAt ? `<button class="mc-btn" onclick="unlockMemberAdmin('${m.id}')">Unlock</button>` : ''}
       <button class="mc-btn" onclick="removeMemberAdmin('${m.id}')" style="color:#991b1b">Remove</button>
     </div>`).join('') || '<div style="font-size:12px;color:#9ca3af">No members yet.</div>';
+}
+// Creates a real login (via the isolated secondary Auth instance, so the admin's own
+// session is untouched) plus the matching Firestore profile in one go — the new member
+// finishes setup themselves via the password-reset email that gets sent automatically.
+async function addMemberAccount() {
+  if (!isAdmin) return;
+  const emailEl = document.getElementById('new-member-email');
+  const nameEl = document.getElementById('new-member-display-name');
+  const email = emailEl.value.trim();
+  const name = nameEl.value.trim();
+  if (!email || !name) { alert('Enter both an email and a name.'); return; }
+  const btn = document.getElementById('btn-create-member');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try {
+    const uid = await window.fbCreateMemberAccount(email);
+    const fresh = newMemberRecord(name);
+    fresh.id = uid;
+    await window.fbSetDoc(window.fbDoc('members', uid), fresh);
+    emailEl.value = ''; nameEl.value = '';
+    alert(`Account created for ${name}. They'll get an email at ${email} to set their password.`);
+    renderMembersList();
+  } catch (e) {
+    let msg = 'Could not create that account: ' + e.message;
+    if (e.code === 'auth/email-already-in-use') msg = 'That email already has an account.';
+    else if (e.code === 'auth/invalid-email') msg = "That doesn't look like a valid email.";
+    alert(msg);
+  }
+  btn.disabled = false; btn.textContent = 'Create Account';
 }
 function renameMemberAdmin(id) {
   const m = data.members.find(x => x.id === id); if (!m) return;
