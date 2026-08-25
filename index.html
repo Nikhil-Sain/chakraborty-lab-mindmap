@@ -205,7 +205,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
     <span class="board-badge" id="board-badge"></span>
     <button class="btn-shape shape-node" id="btn-add-node" onclick="addNodeOfType('node')" title="Add a top-level node under the current project">● Node</button>
     <button class="btn-shape shape-subnode" id="btn-add-sub" onclick="addNodeOfType('sub')" title="Add a child of the selected node">■ Sub Node</button>
-    <button class="btn-shape shape-subsubnode" id="btn-add-subsub" onclick="addNodeOfType('subsub')" title="Add a grandchild of the selected node">◆ Sub Sub Node</button>
+    <button class="btn-shape shape-subsubnode" id="btn-add-subsub" onclick="addNodeOfType('subsub')" title="Add a grandchild of the selected node">◆ Micro Node</button>
     <button class="btn-toolbar" id="btn-add-project" onclick="addProject()">+ Add Project</button>
     <button class="btn-toolbar" id="btn-commit" onclick="commitMyBoard()" title="Lock in everything you've entered so far — you can still add new entries afterward" style="display:none">✅ Commit</button>
     <button class="btn-toolbar" id="btn-undo" onclick="undo()" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
@@ -939,7 +939,7 @@ document.getElementById('ov-node').addEventListener('click', e => { if (e.target
 document.getElementById('ov-connect').addEventListener('click', e => { if (e.target.id === 'ov-connect') closeConnectModal(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeNodeModal(); closeConnectModal(); } });
 
-const KIND_LABEL = { node: 'Node', sub: 'Sub Node', subsub: 'Sub Sub Node' };
+const KIND_LABEL = { node: 'Node', sub: 'Sub Node', subsub: 'Micro Node' };
 // All three buttons attach the new entry to whatever is currently selected (the anchor) —
 // only when nothing is selected does it fall back to the active project's root. 'kind' only
 // controls the new cell's shape/color; it never overrides where it connects from.
@@ -972,7 +972,7 @@ function renameNode(id) {
     if (detailTopicId === id) showTopicDetail(node);
   }, node);
 }
-// Switches a node between Node / Sub Node / Sub Sub Node — only its shape/color/size
+// Switches a node between Node / Sub Node / Micro Node — only its shape/color/size
 // changes; the tree position (who it's connected from and to) is untouched.
 function setNodeKind(id, kind) {
   if (!KIND_LABEL[kind]) return;
@@ -1330,7 +1330,11 @@ function mapUpdate(source) {
 
   const range = computeWeekRange(m);
   const minBandWidth = 220, topMargin = 48, leftMargin = 190;
-  const colInset = 16, cellPadL = 16, cellPadR = 14, colRightMargin = 14, subGap = 8, subPadL = 8, subPadR = 7;
+  const colInset = 16, cellPadL = 18, cellPadR = 16, colRightMargin = 14, subGap = 8, subPadL = 10, subPadR = 9;
+  // Micro Node's parallelogram slants at both the top-left and bottom-right corners (skew,
+  // capped at 13px) — its padding needs to clear that lean on both sides, not just the
+  // straight-edge octagon's small corner cuts that Sub Node uses.
+  const subsubPadL = 14, subsubPadR = 14;
   const lineHeight = 13, cellPadY = 9, minCellHeight = 26, rowGap = 18;
   const totalCols = range.maxIdx - range.minIdx + 1;
 
@@ -1374,11 +1378,15 @@ function mapUpdate(source) {
     const col = idx - range.minIdx;
     const fullWidth = colWidths[col] - colInset - colRightMargin;
     const ref = d.data.nodeRef;
-    const isSub = ref && ref.kind === 'sub';
+    // Sub Node and Micro Node both get the narrow, third-width treatment and share one
+    // cascade per column — a Micro Node dropped into a column that already has Sub Nodes
+    // in it continues the same left/center/right rotation rather than starting its own.
+    const isNarrow = ref && (ref.kind === 'sub' || ref.kind === 'subsub');
 
-    if (isSub) {
+    if (isNarrow) {
+      const [padL, padR] = ref.kind === 'subsub' ? [subsubPadL, subsubPadR] : [subPadL, subPadR];
       const subWidth = (fullWidth - subGap * 2) / 3;
-      const lines = wrapText(d.data.name, subWidth - subPadL - subPadR, TOPIC_FONT);
+      const lines = wrapText(d.data.name, subWidth - padL - padR, TOPIC_FONT);
       const cellHeight = Math.max(minCellHeight, lines.length * lineHeight + cellPadY);
       d.cellWidth = subWidth; d.cellHeight = cellHeight; d.lines = lines;
 
@@ -1681,7 +1689,8 @@ function mapUpdate(source) {
     const lines = d.lines || [n.text];
     const textSel = g.select('.editable-label');
     textSel.selectAll('tspan').remove();
-    const padL = nodeKind(d) === 'sub' ? subPadL : cellPadL;
+    const k = nodeKind(d);
+    const padL = k === 'sub' ? subPadL : k === 'subsub' ? subsubPadL : cellPadL;
     lines.forEach((line, i) => {
       const y = -((lines.length - 1) * lineHeight) / 2 + i * lineHeight;
       textSel.append('tspan').attr('x', padL).attr('y', y).attr('dy', '0.35em').text(line);
