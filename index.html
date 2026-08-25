@@ -74,6 +74,18 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .thread-color-input::-webkit-color-swatch-wrapper{padding:2px}
 .thread-color-input::-webkit-color-swatch{border:none;border-radius:4px}
 .thread-color-input::-moz-color-swatch{border:none;border-radius:4px}
+.filter-menu{position:fixed;display:none;flex-direction:column;gap:2px;background:#ffffff;border:1px solid #e0e7ff;padding:8px;border-radius:12px;z-index:150;box-shadow:0 12px 28px rgba(67,56,202,.18);min-width:190px;max-height:320px;overflow-y:auto}
+.filter-menu.open{display:flex}
+.filter-menu-section{font-size:10px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#9ca3af;padding:6px 6px 3px}
+.filter-menu-section:not(:first-child){margin-top:4px;border-top:1px solid #f1f2f6;padding-top:8px}
+.filter-menu-row{display:flex;align-items:center;gap:7px;padding:5px 6px;border-radius:7px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;white-space:nowrap}
+.filter-menu-row:hover{background:#f3f4f6}
+.filter-menu-row input{cursor:pointer}
+.filter-menu-name{flex:1;overflow:hidden;text-overflow:ellipsis}
+.filter-menu-count{font-size:10.5px;font-weight:700;color:#9ca3af}
+.filter-menu-del{border:none;background:none;color:#9ca3af;cursor:pointer;font-size:12px;padding:2px 4px;border-radius:5px;line-height:1}
+.filter-menu-del:hover{background:#fee2e2;color:#991b1b}
+.filter-menu-empty{font-size:11.5px;color:#9ca3af;padding:5px 6px}
 .toolbar-hint{font-size:11px;color:#9ca3af}
 .node-actions{display:none;align-items:center;gap:8px;margin-left:auto}
 .node-actions.visible{display:flex}
@@ -207,6 +219,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
     <button class="btn-shape shape-subnode" id="btn-add-sub" onclick="addNodeOfType('sub')" title="Add a child of the selected node">■ Sub Node</button>
     <button class="btn-shape shape-subsubnode" id="btn-add-subsub" onclick="addNodeOfType('subsub')" title="Add a grandchild of the selected node">◆ Micro Node</button>
     <button class="btn-toolbar" id="btn-add-project" onclick="addProject()">+ Add Project</button>
+    <button class="btn-toolbar" id="btn-filters" onclick="toggleFilterMenu(event)" title="Filter what's shown on the map">🔍 Filters</button>
     <button class="btn-toolbar" id="btn-commit" onclick="commitMyBoard()" title="Lock in everything you've entered so far — you can still add new entries afterward" style="display:none">✅ Commit</button>
     <button class="btn-toolbar" id="btn-undo" onclick="undo()" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
     <button class="btn-toolbar" id="btn-redo" onclick="redo()" title="Redo (Ctrl+Y)" disabled>↷ Redo</button>
@@ -307,6 +320,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
   </label>
   <button class="thread-del-btn" id="thread-del-btn" onclick="threadRemove()">✕ Remove connection</button>
 </div>
+
+<!-- ── MAP FILTERS (which projects show, plus room for more filter kinds later) ── -->
+<div id="filter-menu" class="filter-menu"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 
@@ -422,6 +438,10 @@ function canEditNode(node) { return canEditBoard() && !isNodeLocked(node); }
 let nodeModalCallback = null;
 let mapRoot = null, mapZoom = null, mapSvgSel = null, mapInner = null, mapNodePositions = {}, mapNodeId = 0;
 let connectFromId = null, detailTopicId = null;
+// Which projects are hidden from the map, per board — a personal, per-session display filter
+// (never saved), keyed by member id so switching boards doesn't carry one board's hidden set
+// onto another's.
+let hiddenProjectIds = {};
 let obstacleCache = []; // every topic cell's rect, refreshed once per render — curves check against this to route around cells they don't touch
 // The small symmetric nudge (see fanOffset() inside mapUpdate) each tree-link/connection
 // endpoint gets when it shares a node with other lines — captured once per render so a live
@@ -872,8 +892,54 @@ function deleteProject(id) {
   m.projects = m.projects.filter(x => x.id !== id);
   if (m.lastProjectId === id) m.lastProjectId = m.projects[0].id;
   if (removedIds.includes(m.lastTopicId)) m.lastTopicId = null;
+  delete hiddenProjectIds[m.id]; // stale ids in a Set are harmless, but no reason to keep them
   save(); closeDetail(); buildD3Map();
+  renderFilterMenu();
 }
+
+// ── PROJECT VISIBILITY (which projects show on the map — a display filter, never saved) ──
+function isProjectHidden(memberId, projectId) {
+  const set = hiddenProjectIds[memberId];
+  return !!(set && set.has(projectId));
+}
+function toggleProjectVisibility(memberId, projectId) {
+  if (!hiddenProjectIds[memberId]) hiddenProjectIds[memberId] = new Set();
+  const set = hiddenProjectIds[memberId];
+  if (set.has(projectId)) set.delete(projectId); else set.add(projectId);
+  renderFilterMenu();
+  if (mapRoot) buildD3Map();
+}
+// ── MAP FILTERS PANEL — starts with per-project visibility; more filter kinds (by node
+// kind, date range, etc.) can grow here later as their own labeled sections. ──
+function renderFilterMenu() {
+  const menu = document.getElementById('filter-menu');
+  const m = activeMember();
+  if (!m || !(m.projects || []).length) { menu.innerHTML = '<div class="filter-menu-empty">No projects yet</div>'; return; }
+  const canDelete = canEditBoard() && m.projects.length > 1;
+  menu.innerHTML = `<div class="filter-menu-section">Projects</div>` + m.projects.map(p => {
+    const count = countTopics(m.topics.filter(t => t.projectId === p.id));
+    const checked = !isProjectHidden(m.id, p.id);
+    return `<label class="filter-menu-row">
+      <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleProjectVisibility('${m.id}','${p.id}')">
+      <span class="filter-menu-name">${escapeHtml(p.name)}</span>
+      <span class="filter-menu-count">${count}</span>
+      ${canDelete ? `<button class="filter-menu-del" title="Delete project" onclick="event.preventDefault(); event.stopPropagation(); deleteProject('${p.id}')">✕</button>` : ''}
+    </label>`;
+  }).join('');
+}
+function toggleFilterMenu(event) {
+  event.stopPropagation();
+  const menu = document.getElementById('filter-menu');
+  const opening = !menu.classList.contains('open');
+  if (opening) {
+    renderFilterMenu();
+    const btn = event.currentTarget.getBoundingClientRect();
+    menu.style.left = btn.left + 'px';
+    menu.style.top = (btn.bottom + 6) + 'px';
+  }
+  menu.classList.toggle('open', opening);
+}
+document.addEventListener('click', e => { if (!e.target.closest('#filter-menu, #btn-filters')) document.getElementById('filter-menu').classList.remove('open'); });
 
 // ── NODES ────────────────────────────────────────────────────────────────
 function collectIds(node) {
@@ -1205,7 +1271,7 @@ function buildTree(m) {
   // d3.hierarchy can hold several independent trails that all share the week-column canvas.
   return {
     id: '__super__', type: 'super', name: '',
-    children: (m.projects || []).map(p => {
+    children: (m.projects || []).filter(p => !isProjectHidden(m.id, p.id)).map(p => {
       const topics = m.topics.filter(t => t.projectId === p.id);
       return { id: p.id, type: 'root', name: p.name, color: m.color, projectId: p.id, count: countTopics(topics), children: topics.map(mapTopic) };
     })
