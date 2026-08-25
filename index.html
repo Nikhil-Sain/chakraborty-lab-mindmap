@@ -206,8 +206,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
     <button class="btn-toolbar" id="btn-commit" onclick="commitMyBoard()" title="Lock in everything you've entered so far — you can still add new entries afterward" style="display:none">✅ Commit</button>
     <button class="btn-toolbar" id="btn-undo" onclick="undo()" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
     <button class="btn-toolbar" id="btn-redo" onclick="redo()" title="Redo (Ctrl+Y)" disabled>↷ Redo</button>
-    <button class="btn-toolbar" onclick="exportData()" title="Download everything as a .json backup file">⬇ Export</button>
-    <button class="btn-toolbar" onclick="triggerImport()" title="Load a previously exported .json backup (replaces everything currently saved here)">⬆ Import</button>
+    <button class="btn-toolbar" id="btn-export" onclick="exportData()" title="Admin only — download everything as a .json backup file" style="display:none">⬇ Export</button>
+    <button class="btn-toolbar" id="btn-import" onclick="triggerImport()" title="Admin only — load a previously exported .json backup into the board you're viewing" style="display:none">⬆ Import</button>
     <input type="file" id="import-file-input" accept="application/json" style="display:none" onchange="handleImportFile(event)">
     <span class="toolbar-hint" id="toolbar-hint"></span>
     <div class="node-actions" id="node-actions">
@@ -429,6 +429,7 @@ function updateUndoButtons() {
 }
 // ── BACKUP / RESTORE — a manual safety net independent of the live database.
 function exportData() {
+  if (!isAdmin) return;
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -439,14 +440,15 @@ function exportData() {
   a.remove();
   URL.revokeObjectURL(url);
 }
-function triggerImport() { document.getElementById('import-file-input').click(); }
-// Only ever imports into your OWN board — a shared backup can't blindly overwrite everyone
-// at once from the browser (security rules wouldn't allow it, and it'd be too easy to nuke
-// someone else's work by accident).
+function triggerImport() { if (!isAdmin) return; document.getElementById('import-file-input').click(); }
+// Admin-only — restricted to reduce the risk of someone accidentally overwriting live data
+// with a stale backup. Still only ever imports into your OWN board — a shared backup can't
+// blindly overwrite everyone at once from the browser (security rules wouldn't allow it).
 function handleImportFile(event) {
   const file = event.target.files[0];
   event.target.value = '';
   if (!file) return;
+  if (!isAdmin) return;
   if (!canEditBoard()) { alert('Sign in and select your own board before importing.'); return; }
   const reader = new FileReader();
   reader.onload = () => {
@@ -1185,6 +1187,8 @@ function updateToolbarHint() {
     document.getElementById(id).disabled = !editable;
   });
   document.getElementById('btn-commit').style.display = (isMyBoard() && !isAdmin) ? '' : 'none';
+  document.getElementById('btn-export').style.display = isAdmin ? '' : 'none';
+  document.getElementById('btn-import').style.display = isAdmin ? '' : 'none';
 
   const el = document.getElementById('toolbar-hint');
   if (!editable) {
