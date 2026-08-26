@@ -50,6 +50,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .btn-toolbar{padding:7px 14px;border-radius:8px;border:1.5px dashed #c4b5fd;background:#faf5ff;color:#6d28d9;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
 .btn-toolbar:hover{background:#f2e8fe}
 .btn-toolbar:disabled{opacity:.4;cursor:not-allowed;background:#faf5ff}
+.add-project-corner:hover rect{fill:#f2e8fe}
 .btn-toolbar:disabled:hover{background:#faf5ff}
 
 /* ── Add-node shape buttons (one bright, distinctly-shaped control per depth) ── */
@@ -222,7 +223,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
     <button class="btn-shape shape-node" id="btn-add-node" onclick="addNodeOfType('node')" title="Add a top-level node under the current project">● Node</button>
     <button class="btn-shape shape-subnode" id="btn-add-sub" onclick="addNodeOfType('sub')" title="Add a child of the selected node">■ Sub Node</button>
     <button class="btn-shape shape-subsubnode" id="btn-add-subsub" onclick="addNodeOfType('subsub')" title="Add a grandchild of the selected node">◆ Micro Node</button>
-    <button class="btn-toolbar" id="btn-add-project" onclick="addProject()">+ Add Project</button>
     <button class="btn-toolbar" id="btn-filters" onclick="toggleFilterMenu(event)" title="Filter what's shown on the map">🔍 Filters</button>
     <button class="btn-toolbar" id="btn-commit" onclick="commitBoard()" title="Admin: lock in everything on this board so far — new entries can still be added afterward" style="display:none">✅ Commit</button>
     <button class="btn-toolbar" id="btn-undo" onclick="undo()" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
@@ -476,6 +476,14 @@ let obstacleCache = []; // every topic cell's rect, refreshed once per render �
 let treeLinkFanOffset = new Map(), connFanOffset = new Map();
 let undoStack = [], redoStack = [];
 const UNDO_LIMIT = 60;
+// save() only ever runs AFTER a mutation has already been applied to the member object, so it
+// can't snapshot "the state to go back to" from `m` itself — that's already the new state. It
+// needs the state as it stood just before this mutation, which is exactly what was stashed
+// here at the end of the PREVIOUS save() (or the last view switch/load, for the very first
+// edit on a board). Keyed per member so switching boards mid-session keeps each one's own
+// history straight.
+let lastSnapshotByMember = {};
+function snapshotBaseline(m) { if (m) lastSnapshotByMember[m.id] = JSON.stringify(m); }
 
 // ── FIRESTORE PERSISTENCE ────────────────────────────────────────────────
 // Each member's data is its own Firestore document (members/{uid}), so security rules can
@@ -489,9 +497,19 @@ const UNDO_LIMIT = 60;
 function save() {
   const m = activeMember();
   if (!m) { updateUndoButtons(); return; }
-  undoStack.push({ memberId: m.id, json: JSON.stringify(m) });
-  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
-  redoStack = [];
+  // Push the state as it stood BEFORE this mutation (the previous baseline) — not `m`, which
+  // already reflects the change that was just made. No baseline yet means this is the first
+  // edit since the board was loaded/switched to, so there's nothing earlier to offer undo to.
+  const before = lastSnapshotByMember[m.id];
+  if (before) {
+    undoStack.push({ memberId: m.id, json: before });
+    if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  }
+  // Only clears THIS board's own redo trail — the stacks hold every board's history mixed
+  // together (so switching boards mid-session doesn't lose anything), so wiping the whole
+  // thing here would erase some other, unrelated board's redo history too.
+  redoStack = redoStack.filter(e => e.memberId !== m.id);
+  snapshotBaseline(m);
   updateUndoButtons();
   pushMemberToFirestore(m);
 }
@@ -511,8 +529,11 @@ async function pushMemberPatch(memberId, patch) {
   await pushMemberToFirestore(m);
 }
 function updateUndoButtons() {
-  const u = document.getElementById('btn-undo'); if (u) u.disabled = !undoStack.length;
-  const r = document.getElementById('btn-redo'); if (r) r.disabled = !redoStack.length;
+  // Scoped to whichever board is actually on screen — the stacks hold every board's history
+  // together, so "any entries at all" isn't the same question as "anything to undo/redo here."
+  const id = activeMember() && activeMember().id;
+  const u = document.getElementById('btn-undo'); if (u) u.disabled = !id || !undoStack.some(e => e.memberId === id);
+  const r = document.getElementById('btn-redo'); if (r) r.disabled = !id || !redoStack.some(e => e.memberId === id);
 }
 // ── BACKUP / RESTORE — a manual safety net independent of the live database.
 function exportData() {
@@ -553,21 +574,30 @@ function handleImportFile(event) {
   reader.readAsText(file);
 }
 function undo() {
-  if (!undoStack.length) return;
-  const entry = undoStack.pop();
-  const m = data.members.find(x => x.id === entry.memberId); if (!m) return;
-  redoStack.push({ memberId: entry.memberId, json: JSON.stringify(m) });
+  const m = activeMember(); if (!m) return;
+  // The stacks interleave every board's history, so the entry to undo is this board's own
+  // most recent one — not necessarily the very top, since another board edited more recently
+  // could be sitting above it.
+  const idx = undoStack.map(e => e.memberId).lastIndexOf(m.id);
+  if (idx === -1) return;
+  const entry = undoStack.splice(idx, 1)[0];
+  redoStack.push({ memberId: m.id, json: JSON.stringify(m) });
   Object.assign(m, JSON.parse(entry.json));
+  // The board just moved to this restored state, so that's the baseline the NEXT save()
+  // should treat as "before" — otherwise it would push the stale pre-undo state instead.
+  snapshotBaseline(m);
   updateUndoButtons();
   pushMemberToFirestore(m);
   renderAll();
 }
 function redo() {
-  if (!redoStack.length) return;
-  const entry = redoStack.pop();
-  const m = data.members.find(x => x.id === entry.memberId); if (!m) return;
-  undoStack.push({ memberId: entry.memberId, json: JSON.stringify(m) });
+  const m = activeMember(); if (!m) return;
+  const idx = redoStack.map(e => e.memberId).lastIndexOf(m.id);
+  if (idx === -1) return;
+  const entry = redoStack.splice(idx, 1)[0];
+  undoStack.push({ memberId: m.id, json: JSON.stringify(m) });
   Object.assign(m, JSON.parse(entry.json));
+  snapshotBaseline(m);
   updateUndoButtons();
   pushMemberToFirestore(m);
   renderAll();
@@ -654,6 +684,10 @@ async function handleAuthChange(user) {
     realIsAdmin = !!(me && me.isAdmin);
     applyAdminPreview();
     reconcileViewAfterDataChange();
+    // Lazy init only — never overwrites an in-progress baseline. Covers the very first
+    // snapshot after signing in, when switchViewMember() was never called for this board.
+    const cur = activeMember();
+    if (cur && !lastSnapshotByMember[cur.id]) snapshotBaseline(cur);
     renderAll();
   }, err => console.error('members listener error', err));
 }
@@ -804,8 +838,11 @@ function newMemberRecord(name) {
   return { id: genId(), name, projects: [{ id: projId, name: 'New Project' }], lastProjectId: projId, color: PALETTE[data.members.length % PALETTE.length], topics: [], connections: [], lastTopicId: null, committedAt: null, isAdmin: false };
 }
 function switchViewMember(id) {
-  if (!data.members.some(m => m.id === id)) return;
+  const m = data.members.find(x => x.id === id); if (!m) return;
   viewMemberId = id;
+  // So the very first edit on this board (this session) has a real "before" state to undo
+  // back to, rather than nothing — see save()'s baseline handling.
+  if (!lastSnapshotByMember[id]) snapshotBaseline(m);
   closeDetail();
   buildD3Map();
 }
@@ -959,17 +996,17 @@ function renderFilterMenu() {
   const menu = document.getElementById('filter-menu');
   const m = activeMember();
   if (!m || !(m.projects || []).length) { menu.innerHTML = '<div class="filter-menu-empty">No projects yet</div>'; return; }
-  const canDelete = canEditBoard() && m.projects.length > 1;
   menu.innerHTML = `<div class="filter-menu-section">Projects</div>` + m.projects.map(p => {
     const count = countTopics(m.topics.filter(t => t.projectId === p.id));
     const checked = !isProjectHidden(m.id, p.id);
     const collapsed = isProjectCollapsed(m.id, p.id);
+    // Deleting lives on the project's own detail panel (click its smiley) — no need to
+    // duplicate that destructive action here too.
     return `<label class="filter-menu-row">
       <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleProjectVisibility('${m.id}','${p.id}')">
       <span class="filter-menu-name">${escapeHtml(p.name)}</span>
       <span class="filter-menu-count">${count}</span>
       <button class="filter-menu-del" title="${collapsed ? 'Expand' : 'Collapse'} project" onclick="event.preventDefault(); event.stopPropagation(); toggleProjectCollapse('${m.id}','${p.id}')">${collapsed ? '▸' : '▾'}</button>
-      ${canDelete ? `<button class="filter-menu-del" title="Delete project" onclick="event.preventDefault(); event.stopPropagation(); deleteProject('${p.id}')">✕</button>` : ''}
     </label>`;
   }).join('');
 }
@@ -1400,6 +1437,10 @@ function handleAvatarFile(event) {
 function updateToolbarHint() {
   const m = activeMember(); if (!m) return;
   const editable = canEditBoard();
+  // Undo/redo availability is per-board — refresh it here too, not just after an actual
+  // save/undo/redo, so switching to a different board doesn't leave the buttons showing
+  // stale state left over from whichever board you were on before.
+  updateUndoButtons();
 
   const badge = document.getElementById('board-badge');
   // Admin needs to see THIS board's review state at a glance — that's the whole point of
@@ -1409,7 +1450,7 @@ function updateToolbarHint() {
   else if (isMyBoard()) { badge.textContent = m.committedAt ? '🔒 Your board — committed (new entries still OK)' : '✏️ Your board — saved, awaiting admin review'; badge.className = 'board-badge mine'; }
   else { badge.textContent = '👀 Read-only'; badge.className = 'board-badge readonly'; }
 
-  ['btn-add-node', 'btn-add-sub', 'btn-add-subsub', 'btn-add-project'].forEach(id => {
+  ['btn-add-node', 'btn-add-sub', 'btn-add-subsub'].forEach(id => {
     document.getElementById(id).disabled = !editable;
   });
   document.getElementById('btn-commit').style.display = isAdmin ? '' : 'none';
@@ -1665,6 +1706,20 @@ function mapUpdate(source) {
     bandsLayer.append('text').attr('x', bx + bw / 2).attr('y', 36).attr('text-anchor', 'middle')
       .attr('font-size', '9.5').attr('fill', 'rgba(30,41,59,.55)')
       .text(formatWeekRange(wStart, wEnd));
+  }
+
+  // "+ Add Project" sits in the one cell that's neither a week nor a project lane — the
+  // corner where the header row and the lane column meet — instead of living in the fixed
+  // toolbar above the map.
+  if (canEditBoard()) {
+    const cornerBtn = bandsLayer.append('g').attr('class', 'add-project-corner').style('cursor', 'pointer')
+      .on('click', () => addProject());
+    cornerBtn.append('rect').attr('x', 2).attr('y', 2).attr('width', leftMargin - 4).attr('height', weekHeaderHeight - 4)
+      .attr('rx', 8).attr('fill', '#faf5ff').attr('stroke', '#c4b5fd').attr('stroke-width', 1.5).attr('stroke-dasharray', '4,3');
+    cornerBtn.append('text').attr('x', leftMargin / 2).attr('y', weekHeaderHeight / 2).attr('text-anchor', 'middle').attr('dy', '0.35em')
+      .attr('font-size', '12').attr('font-weight', '700').attr('fill', '#6d28d9').style('user-select', 'none')
+      .text('+ Add Project');
+    cornerBtn.append('title').text('Add a new project');
   }
 
   // A strict 2-segment elbow only has 2 possible directions, so once 3+ lines share the exact
