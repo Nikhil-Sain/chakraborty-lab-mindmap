@@ -15,6 +15,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .btn-hdr{padding:6px 12px;margin-left:8px;border-radius:8px;border:1.5px solid rgba(255,255,255,.3);background:rgba(255,255,255,.12);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
 .btn-hdr:hover{background:rgba(255,255,255,.22)}
 .admin-badge{background:#ede9fe;border-color:#c4b5fd;color:#6d28d9;cursor:default}
+.admin-preview-active{background:#fef3c7;border-color:#fbbf24;color:#92400e}
+.admin-preview-active:hover{background:#fde68a}
 
 /* ── Login screen ── */
 .login-overlay{display:none;position:fixed;inset:0;z-index:300;align-items:center;justify-content:center;background:linear-gradient(180deg,#eef2ff 0%,#f6f8fc 100%)}
@@ -40,6 +42,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .member-tab.active .member-avatar{box-shadow:0 0 0 1.5px #7c3aed}
 .member-tab-name{font-size:10px;font-weight:700;color:#374151;word-break:break-word;line-height:1.25;max-width:100%}
 .member-tab-lock{position:absolute;top:4px;right:8px;font-size:10px}
+.member-tab-review{font-size:7.5px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:5px;padding:1px 5px;white-space:nowrap}
 .member-avatar-edit{position:absolute;top:32px;left:50%;transform:translateX(6px);width:18px;height:18px;border-radius:50%;background:#7c3aed;color:#fff;border:1.5px solid #fff;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
 .member-avatar-edit:hover{background:#6d28d9}
 .member-sidebar-empty{font-size:10.5px;color:#9ca3af;text-align:center;padding:10px 4px}
@@ -205,6 +208,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
   <div class="hdr-logo">🔬 Chakraborty Research Lab</div>
   <div class="hdr-spacer"></div>
   <span class="btn-hdr admin-badge" id="admin-badge" style="display:none">🔓 Admin</span>
+  <button class="btn-hdr" id="btn-admin-preview" onclick="toggleAdminPreview()" style="display:none" title="Switch between your admin view and seeing/working the board as a regular member would">👤 View as Member</button>
   <button class="btn-hdr" id="btn-manage-members" onclick="openMemberManager()" style="display:none">👥 Manage Members</button>
   <button class="btn-hdr" id="btn-sign-out" onclick="handleSignOut()" style="display:none">🚪 Sign Out</button>
 </div>
@@ -220,7 +224,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
     <button class="btn-shape shape-subsubnode" id="btn-add-subsub" onclick="addNodeOfType('subsub')" title="Add a grandchild of the selected node">◆ Micro Node</button>
     <button class="btn-toolbar" id="btn-add-project" onclick="addProject()">+ Add Project</button>
     <button class="btn-toolbar" id="btn-filters" onclick="toggleFilterMenu(event)" title="Filter what's shown on the map">🔍 Filters</button>
-    <button class="btn-toolbar" id="btn-commit" onclick="commitMyBoard()" title="Lock in everything you've entered so far — you can still add new entries afterward" style="display:none">✅ Commit</button>
+    <button class="btn-toolbar" id="btn-commit" onclick="commitBoard()" title="Admin: lock in everything on this board so far — new entries can still be added afterward" style="display:none">✅ Commit</button>
     <button class="btn-toolbar" id="btn-undo" onclick="undo()" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
     <button class="btn-toolbar" id="btn-redo" onclick="redo()" title="Redo (Ctrl+Y)" disabled>↷ Redo</button>
     <button class="btn-toolbar" id="btn-export" onclick="exportData()" title="Admin only — download everything as a .json backup file" style="display:none">⬇ Export</button>
@@ -406,6 +410,10 @@ const WEEK_BAND_COLORS = [
   { fill: '#f6f4fd', header: '#e8e1fa', border: '#c4b5fd' },
   { fill: '#f1faf8', header: '#dcf1ec', border: '#7fdbc4' }
 ];
+// Warm, saturated accents for project lanes — a deliberately different hue family from the
+// cool week-column tints above, so the two grids (vertical weeks, horizontal project lanes)
+// read as two independent overlays instead of blending into one confusing checkerboard.
+const PROJECT_LANE_COLORS = ['#f97316', '#e11d48', '#0d9488', '#7c3aed', '#ca8a04', '#0ea5e9'];
 const THREAD_WIDTH = 2.75;
 // A direction arrow centered at the origin, pointing along +x — placed at each thread's
 // midpoint (not one end) and rotated to match the curve's tangent there.
@@ -422,7 +430,21 @@ let data = { members: [] };
 // user's UID. No more per-browser "pick your name," no more PIN: who you are and whether
 // you're admin are both real, server-known facts, not something a browser session invents.
 let viewMemberId = null;
+// realIsAdmin is the actual, server-known fact (from the member's own Firestore doc) and
+// never changes just because the UI does — Firestore's own security rules are what actually
+// gate writes, regardless of anything on this page. isAdmin is what the rest of the app
+// reads everywhere; adminPreviewAsRegular lets an admin flip it off for themselves, purely
+// client-side, to see and work the board the way a regular member would.
+let realIsAdmin = false;
+let adminPreviewAsRegular = false;
 let isAdmin = false;
+function applyAdminPreview() { isAdmin = realIsAdmin && !adminPreviewAsRegular; }
+function toggleAdminPreview() {
+  if (!realIsAdmin) return;
+  adminPreviewAsRegular = !adminPreviewAsRegular;
+  applyAdminPreview();
+  renderAll();
+}
 let firebaseUser = null;
 const myMemberId = () => firebaseUser ? firebaseUser.uid : null;
 function isMyBoard() { return !!viewMemberId && viewMemberId === myMemberId(); }
@@ -442,6 +464,9 @@ let connectFromId = null, detailTopicId = null;
 // (never saved), keyed by member id so switching boards doesn't carry one board's hidden set
 // onto another's.
 let hiddenProjectIds = {};
+// Which projects are collapsed to a minimal-height lane (topics hidden, row still shown) —
+// same per-session, per-board, never-saved treatment as hiddenProjectIds above.
+let collapsedProjectIds = {};
 let obstacleCache = []; // every topic cell's rect, refreshed once per render — curves check against this to route around cells they don't touch
 // The small symmetric nudge (see fanOffset() inside mapUpdate) each tree-link/connection
 // endpoint gets when it shares a node with other lines — captured once per render so a live
@@ -607,7 +632,7 @@ async function handleAuthChange(user) {
   firebaseUser = user;
   if (unsubscribeMembers) { unsubscribeMembers(); unsubscribeMembers = null; }
   if (!user) {
-    data.members = []; viewMemberId = null; isAdmin = false;
+    data.members = []; viewMemberId = null; realIsAdmin = false; adminPreviewAsRegular = false; applyAdminPreview();
     showLoginScreen();
     renderAll();
     return;
@@ -626,7 +651,8 @@ async function handleAuthChange(user) {
   unsubscribeMembers = window.fbOnSnapshot(window.fbCollection('members'), snapshot => {
     data.members = snapshot.docs.map(d => d.data());
     const me = data.members.find(x => x.id === myMemberId());
-    isAdmin = !!(me && me.isAdmin);
+    realIsAdmin = !!(me && me.isAdmin);
+    applyAdminPreview();
     reconcileViewAfterDataChange();
     renderAll();
   }, err => console.error('members listener error', err));
@@ -783,9 +809,14 @@ function switchViewMember(id) {
   closeDetail();
   buildD3Map();
 }
-function commitMyBoard() {
-  const m = activeMember(); if (!m || !isMyBoard()) return;
-  if (!confirm('Commit your current entries? Everything you have so far becomes read-only — you can still add brand-new entries afterward, just can\'t edit what\'s already here.')) return;
+// Committing is an admin-only review step now — a member just saves their work as they go;
+// the admin looks it over on the member's own board and locks it in once it's ready, which
+// is the only thing that actually freezes existing entries (new ones can still be added
+// after a commit, same as before).
+function commitBoard() {
+  const m = activeMember(); if (!m || !isAdmin) return;
+  const whose = isMyBoard() ? 'your own' : `"${m.name}"'s`;
+  if (!confirm(`Commit ${whose} current entries? Everything here so far becomes read-only — new entries can still be added afterward, just not edits to what's already here.`)) return;
   m.committedAt = Date.now();
   save(); renderAll();
 }
@@ -909,6 +940,19 @@ function toggleProjectVisibility(memberId, projectId) {
   renderFilterMenu();
   if (mapRoot) buildD3Map();
 }
+// ── PROJECT COLLAPSE (shrink a project's lane to a minimal strip, topics hidden but the
+// row itself stays visible — unlike hiding, which drops the project from the map entirely) ──
+function isProjectCollapsed(memberId, projectId) {
+  const set = collapsedProjectIds[memberId];
+  return !!(set && set.has(projectId));
+}
+function toggleProjectCollapse(memberId, projectId) {
+  if (!collapsedProjectIds[memberId]) collapsedProjectIds[memberId] = new Set();
+  const set = collapsedProjectIds[memberId];
+  if (set.has(projectId)) set.delete(projectId); else set.add(projectId);
+  renderFilterMenu();
+  if (mapRoot) buildD3Map();
+}
 // ── MAP FILTERS PANEL — starts with per-project visibility; more filter kinds (by node
 // kind, date range, etc.) can grow here later as their own labeled sections. ──
 function renderFilterMenu() {
@@ -919,10 +963,12 @@ function renderFilterMenu() {
   menu.innerHTML = `<div class="filter-menu-section">Projects</div>` + m.projects.map(p => {
     const count = countTopics(m.topics.filter(t => t.projectId === p.id));
     const checked = !isProjectHidden(m.id, p.id);
+    const collapsed = isProjectCollapsed(m.id, p.id);
     return `<label class="filter-menu-row">
       <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleProjectVisibility('${m.id}','${p.id}')">
       <span class="filter-menu-name">${escapeHtml(p.name)}</span>
       <span class="filter-menu-count">${count}</span>
+      <button class="filter-menu-del" title="${collapsed ? 'Expand' : 'Collapse'} project" onclick="event.preventDefault(); event.stopPropagation(); toggleProjectCollapse('${m.id}','${p.id}')">${collapsed ? '▸' : '▾'}</button>
       ${canDelete ? `<button class="filter-menu-del" title="Delete project" onclick="event.preventDefault(); event.stopPropagation(); deleteProject('${p.id}')">✕</button>` : ''}
     </label>`;
   }).join('');
@@ -974,6 +1020,14 @@ function searchParentNode(arr, id, parent) {
 function findParentNode(m, id) { const r = searchParentNode(m.topics, id, null); return r === undefined ? null : r; }
 function countTopics(arr) { return arr.reduce((s, n) => s + 1 + countTopics(n.children || []), 0); }
 function allTopicNodes(arr, acc) { arr.forEach(n => { acc.push(n); allTopicNodes(n.children || [], acc); }); return acc; }
+// True whenever a member has content the admin hasn't locked in yet — anything created
+// after their last commit (or everything, if they've never been committed at all). Once a
+// node is committed it's locked and the member can't touch it again, so this is exactly the
+// set of changes admin review could still act on.
+function memberNeedsReview(m) {
+  const since = m.committedAt || 0;
+  return allTopicNodes(m.topics || [], []).some(t => (t.createdAt || 0) > since);
+}
 
 // ── ADD / EDIT MODAL (text + date, plus a type switcher when editing an existing node) ──
 function renderKindRow(id, kind) {
@@ -1273,7 +1327,10 @@ function buildTree(m) {
     id: '__super__', type: 'super', name: '',
     children: (m.projects || []).filter(p => !isProjectHidden(m.id, p.id)).map(p => {
       const topics = m.topics.filter(t => t.projectId === p.id);
-      return { id: p.id, type: 'root', name: p.name, color: m.color, projectId: p.id, count: countTopics(topics), children: topics.map(mapTopic) };
+      const collapsed = isProjectCollapsed(m.id, p.id);
+      // A collapsed project keeps its root/lane visible but drops its topics from the tree
+      // entirely (not just visually) — its lane shrinks to a minimal strip below.
+      return { id: p.id, type: 'root', name: p.name, color: m.color, projectId: p.id, count: countTopics(topics), collapsed, children: collapsed ? [] : topics.map(mapTopic) };
     })
   };
 }
@@ -1283,6 +1340,12 @@ function updateHeaderControls() {
   document.getElementById('admin-badge').style.display = isAdmin ? '' : 'none';
   document.getElementById('btn-manage-members').style.display = isAdmin ? '' : 'none';
   document.getElementById('btn-sign-out').style.display = firebaseUser ? '' : 'none';
+  // Stays visible (and clickable) to a real admin no matter which side of the toggle they're
+  // currently on — that's the only way back once they've switched to the member view.
+  const previewBtn = document.getElementById('btn-admin-preview');
+  previewBtn.style.display = realIsAdmin ? '' : 'none';
+  previewBtn.textContent = adminPreviewAsRegular ? '🔓 Back to Admin View' : '👤 View as Member';
+  previewBtn.classList.toggle('admin-preview-active', adminPreviewAsRegular);
   renderMemberSidebar();
 }
 // Vertical tab strip on the left — one entry per member, with their avatar (or initials as
@@ -1297,6 +1360,7 @@ function renderMemberSidebar() {
     return `<div class="member-tab${mm.id === viewMemberId ? ' active' : ''}" onclick="switchViewMember('${mm.id}')" title="${escapeHtml(mm.name)}${mm.id === myMemberId() ? ' (me)' : ''}">
       <div class="member-avatar" style="${avatarStyle}">${mm.avatar ? '' : escapeHtml(initials(mm.name))}</div>
       <span class="member-tab-name">${escapeHtml(truncate(mm.name, 12))}</span>
+      ${isAdmin && memberNeedsReview(mm) ? '<span class="member-tab-review">Needs review</span>' : ''}
       ${mm.committedAt ? '<span class="member-tab-lock">🔒</span>' : ''}
       ${canPic ? `<button class="member-avatar-edit" onclick="event.stopPropagation(); changeAvatar('${mm.id}')" title="Change profile picture">📷</button>` : ''}
     </div>`;
@@ -1338,14 +1402,17 @@ function updateToolbarHint() {
   const editable = canEditBoard();
 
   const badge = document.getElementById('board-badge');
-  if (isAdmin) { badge.textContent = '🔓 Admin — full access'; badge.className = 'board-badge admin'; }
-  else if (isMyBoard()) { badge.textContent = m.committedAt ? '🔒 Your board — committed (new entries still OK)' : '✏️ Your board'; badge.className = 'board-badge mine'; }
+  // Admin needs to see THIS board's review state at a glance — that's the whole point of
+  // reviewing it before deciding whether to commit — rather than a generic "full access"
+  // label that never changed no matter which member's board was open.
+  if (isAdmin) { badge.textContent = `🔓 Admin · ${m.committedAt ? '🔒 committed' : '✏️ draft — awaiting review'}`; badge.className = 'board-badge admin'; }
+  else if (isMyBoard()) { badge.textContent = m.committedAt ? '🔒 Your board — committed (new entries still OK)' : '✏️ Your board — saved, awaiting admin review'; badge.className = 'board-badge mine'; }
   else { badge.textContent = '👀 Read-only'; badge.className = 'board-badge readonly'; }
 
   ['btn-add-node', 'btn-add-sub', 'btn-add-subsub', 'btn-add-project'].forEach(id => {
     document.getElementById(id).disabled = !editable;
   });
-  document.getElementById('btn-commit').style.display = (isMyBoard() && !isAdmin) ? '' : 'none';
+  document.getElementById('btn-commit').style.display = isAdmin ? '' : 'none';
   document.getElementById('btn-export').style.display = isAdmin ? '' : 'none';
   document.getElementById('btn-import').style.display = isAdmin ? '' : 'none';
 
@@ -1387,6 +1454,9 @@ function buildD3Map() {
   svg.call(mapZoom);
   mapInner = svg.append('g');
   mapInner.append('g').attr('class', 'bands-layer');
+  // Above the (opaque) week bands so its low-opacity tint reads as a wash over them, rather
+  // than being hidden underneath — but still behind every topic cell/thread, appended later.
+  mapInner.append('g').attr('class', 'lanes-layer');
   mapSvgSel = svg;
 
   const treeData = buildTree(m);
@@ -1401,7 +1471,7 @@ function mapUpdate(source) {
   const m = activeMember(); if (!m) return;
 
   const range = computeWeekRange(m);
-  const minBandWidth = 220, topMargin = 48, leftMargin = 190;
+  const minBandWidth = 220, topMargin = 48, leftMargin = 190, weekHeaderHeight = 40;
   const colInset = 16, cellPadL = 18, cellPadR = 16, colRightMargin = 14, subPadL = 10, subPadR = 9;
   // Micro Node's parallelogram slants at both the top-left and bottom-right corners (skew,
   // capped at 13px) — its padding needs to clear that lean on both sides, not just the
@@ -1434,10 +1504,11 @@ function mapUpdate(source) {
   // date falls in (never manual). Vertical position: a freshly-added child prefers to line
   // up with its parent's own row (rather than starting back at the top of its column), a
   // manually-dragged cell keeps the exact row it was dropped on, and anything else just
-  // stacks below whatever else has already claimed that column so nothing overlaps.
-  const colY = []; for (let c = 0; c < totalCols; c++) colY[c] = topMargin;
-  nodes.forEach(d => {
-    if (d.data.type === 'root') return;
+  // stacks below whatever else has already claimed that column so nothing overlaps — all of
+  // this is scoped to ONE project's own local column tracker (see the per-project lane loop
+  // below), so two different projects' entries never share a stacking order even when they
+  // fall in the very same week.
+  function layoutTopic(d, colY) {
     const wk = weekOfYear(d.data.date);
     const idx = Math.min(range.maxIdx, Math.max(range.minIdx, wk.absIdx));
     const col = idx - range.minIdx;
@@ -1503,32 +1574,72 @@ function mapUpdate(source) {
     d.cellHeight = cellHeight;
     d.lines = lines;
     colY[col] = Math.max(colY[col], top + cellHeight + rowGap);
+  }
+
+  // One independent vertical "lane" per project, stacked top to bottom in project order —
+  // each is laid out using its own local column tracker (so its topics stack against only
+  // each other, never against another project's), then shifted down into its own reserved
+  // band. This is what keeps different projects' entries from ever interleaving within a
+  // shared week column, while a cross-project connection can still freely be drawn between
+  // any two cells regardless of which lane they land in.
+  const projectRootNodes = nodes.filter(d => d.data.type === 'root');
+  const laneGap = 56, minLaneHeight = 110, collapsedLaneHeight = 64;
+  const laneBounds = [];
+  let laneCursor = 0;
+  projectRootNodes.forEach((pr, i) => {
+    const colY = []; for (let c = 0; c < totalCols; c++) colY[c] = topMargin;
+    const topics = pr.descendants().filter(d => d.data.type === 'topic');
+    topics.forEach(d => layoutTopic(d, colY));
+    const laneTop = laneCursor;
+    const laneHeight = pr.data.collapsed ? collapsedLaneHeight : Math.max(Math.max(topMargin, ...colY), minLaneHeight);
+    topics.forEach(d => { d.x += laneTop; });
+    const topicXs = topics.map(d => d.x);
+    pr.y = 150;
+    pr.x = topicXs.length ? (Math.min(...topicXs) + Math.max(...topicXs)) / 2 : laneTop + laneHeight / 2;
+    laneBounds.push({ name: pr.data.name, color: PROJECT_LANE_COLORS[i % PROJECT_LANE_COLORS.length], top: laneTop, bottom: laneTop + laneHeight });
+    laneCursor = laneTop + laneHeight + laneGap;
   });
+  const maxColBottom = Math.max(topMargin, laneCursor - laneGap);
   obstacleCache = nodes.filter(d => d.data.type === 'topic').map(d => ({
     id: d.data.nodeRef.id, x: d.y, y: d.x - d.cellHeight / 2, w: d.cellWidth, h: d.cellHeight
   }));
-  const maxColBottom = Math.max(topMargin, ...colY);
-  // Each project gets its own root circle, vertically centered on the span of its own
-  // topics (an empty project falls back to a stacked default slot near the top).
-  const projectRootNodes = nodes.filter(d => d.data.type === 'root');
-  let emptyProjectSlot = 0;
-  projectRootNodes.forEach(pr => {
-    const topicXs = pr.descendants().filter(d => d.data.type === 'topic').map(d => d.x);
-    pr.y = 150;
-    if (topicXs.length) pr.x = (Math.min(...topicXs) + Math.max(...topicXs)) / 2;
-    else { pr.x = topMargin + 20 + emptyProjectSlot * 56; emptyProjectSlot++; }
-  });
-  // Two projects can independently land on the same natural center (e.g. each has just
-  // one topic in its own first row) — declutter so root circles never touch.
-  const minRootGap = 96;
-  projectRootNodes.slice().sort((a, b) => a.x - b.x).forEach((pr, i, arr) => {
-    if (i > 0 && pr.x < arr[i - 1].x + minRootGap) pr.x = arr[i - 1].x + minRootGap;
-  });
 
   const plotHeight = Math.max(mapSvgSel.node().clientHeight || 0, maxColBottom + 30);
 
   mapNodePositions = {};
   nodes.forEach(d => { mapNodePositions[d.data.id] = nodePos(d); });
+
+  // project lane bands — a horizontal strip per project, crossing every week column, so
+  // projects stay visually segregated independently of the vertical week tinting below. A
+  // cross-project connection is drawn in its own overlay regardless (see further down) and
+  // freely crosses these lane boundaries.
+  const lanesLayer = mapInner.select('.lanes-layer');
+  lanesLayer.selectAll('*').remove();
+  const laneRight = colX[totalCols - 1] + colWidths[totalCols - 1];
+  const laneTopPad = 10, laneBottomPad = 16;
+  laneBounds.forEach((lane, i) => {
+    // Adjacent lanes' tinted rects meet exactly at the midpoint between them (no empty gap
+    // left uncolored) so the whole canvas reads as one continuous stack of project rows, with
+    // a bold rule drawn right at that seam — a floating, disconnected line was easy to miss.
+    const prev = laneBounds[i - 1], next = laneBounds[i + 1];
+    // The very first lane has no previous lane to split a seam with — its own top padding
+    // would otherwise creep above y=0 and paint over the week header row, making the map
+    // look like that project starts before the calendar does. Clamp it to sit right under
+    // the header strip instead.
+    const rectTop = prev ? (prev.bottom + lane.top) / 2 : Math.max(weekHeaderHeight, lane.top - laneTopPad);
+    const rectBottom = next ? (lane.bottom + next.top) / 2 : lane.bottom + laneBottomPad;
+    lanesLayer.append('rect')
+      .attr('x', 0).attr('y', rectTop).attr('width', laneRight).attr('height', rectBottom - rectTop)
+      .attr('fill', lane.color).attr('fill-opacity', 0.07);
+    lanesLayer.append('rect')
+      .attr('x', 0).attr('y', rectTop).attr('width', 5).attr('height', rectBottom - rectTop)
+      .attr('fill', lane.color);
+    if (i > 0) {
+      lanesLayer.append('line')
+        .attr('x1', 0).attr('x2', laneRight).attr('y1', rectTop).attr('y2', rectTop)
+        .attr('stroke', '#64748b').attr('stroke-opacity', 0.6).attr('stroke-width', 2);
+    }
+  });
 
   // week background bands (variable width, sized in pass 1)
   const bandsLayer = mapInner.select('.bands-layer');
@@ -1543,10 +1654,10 @@ function mapUpdate(source) {
       .attr('fill', band.fill)
       .attr('stroke', band.border).attr('stroke-width', 1.5);
     bandsLayer.append('rect')
-      .attr('x', bx).attr('y', 0).attr('width', bw).attr('height', 40)
+      .attr('x', bx).attr('y', 0).attr('width', bw).attr('height', weekHeaderHeight)
       .attr('fill', band.header);
     bandsLayer.append('line')
-      .attr('x1', bx).attr('x2', bx + bw).attr('y1', 40).attr('y2', 40)
+      .attr('x1', bx).attr('x2', bx + bw).attr('y1', weekHeaderHeight).attr('y2', weekHeaderHeight)
       .attr('stroke', band.border).attr('stroke-opacity', 0.55).attr('stroke-width', 1);
     bandsLayer.append('text').attr('x', bx + bw / 2).attr('y', 23).attr('text-anchor', 'middle')
       .attr('font-size', '13.5').attr('font-weight', '800').attr('fill', '#1e293b')
@@ -1693,7 +1804,13 @@ function mapUpdate(source) {
     .on('click', (e, d) => { e.stopPropagation(); onNodeClick(d); });
 
   const rE = nodeEnter.filter(d => d.data.type === 'root');
-  rE.append('circle').attr('class', 'anchor-ring').attr('r', 26).attr('fill', 'none').attr('stroke', '#fbbf24').attr('stroke-width', 2).attr('stroke-opacity', 0);
+  // pointer-events:all makes this ring's invisible fill (not just its sometime-visible
+  // stroke) clickable too — without it, the only thing under the pointer at most points
+  // inside the emoji is this ring's empty fill, which by default doesn't catch clicks, so
+  // they fell through to whatever's painted behind (e.g. a project lane's background band)
+  // instead of reaching this node's own click handler.
+  rE.append('circle').attr('class', 'anchor-ring').attr('r', 26).attr('fill', 'none').attr('stroke', '#fbbf24').attr('stroke-width', 2).attr('stroke-opacity', 0)
+    .style('pointer-events', 'all');
   rE.append('text').attr('class', 'root-emoji').attr('text-anchor', 'middle').attr('dy', '0.38em')
     .attr('font-size', ROOT_EMOJI_SIZE).style('pointer-events', 'none').style('user-select', 'none').text('🙂');
   rE.each(function (d) {
@@ -1707,7 +1824,22 @@ function mapUpdate(source) {
       text.append('tspan').attr('x', ROOT_LABEL_X).attr('y', y).attr('dy', '0.32em').text(line);
     });
     g.append('text').attr('text-anchor', 'middle').attr('x', 0).attr('y', ROOT_EMOJI_SIZE / 2 + 16)
-      .attr('font-size', '10').attr('fill', 'rgba(30,41,59,.55)').text(`${d.data.count} topic${d.data.count !== 1 ? 's' : ''}`);
+      .attr('font-size', '10').attr('fill', 'rgba(30,41,59,.55)')
+      .text(`${d.data.count} topic${d.data.count !== 1 ? 's' : ''}` + (d.data.collapsed ? ' · collapsed' : ''));
+
+    // A small badge at the emoji's corner shrinks/restores this project's whole lane —
+    // stopPropagation so it never also triggers the parent's onNodeClick (select-as-anchor).
+    const collapseBtn = g.append('g').attr('class', 'lane-collapse-btn')
+      .attr('transform', `translate(${ROOT_EMOJI_SIZE / 2 - 2},${-ROOT_EMOJI_SIZE / 2 + 2})`)
+      .style('cursor', 'pointer')
+      .on('click', function (event) {
+        event.stopPropagation();
+        toggleProjectCollapse(activeMember().id, d.data.projectId);
+      });
+    collapseBtn.append('circle').attr('r', 9).attr('fill', '#fff').attr('stroke', '#cbd5e1').attr('stroke-width', 1.2);
+    collapseBtn.append('text').attr('text-anchor', 'middle').attr('dy', '0.35em').attr('font-size', 10)
+      .attr('fill', '#475569').style('user-select', 'none').text(d.data.collapsed ? '▸' : '▾');
+    collapseBtn.append('title').text(d.data.collapsed ? 'Expand this project' : 'Collapse this project');
   });
 
   // Topics render as spreadsheet-style cells, same width as every other cell in their
@@ -1760,6 +1892,22 @@ function mapUpdate(source) {
     .on('mouseenter', () => cancelHideHoverCard())
     .on('mouseleave', () => scheduleHideHoverCard());
 
+  // A selected thread's own endpoint handle sits right on top of that same cell's drag-handle
+  // grip (both anchor near the cell's edge), so the two fight for clicks — hiding the grip on
+  // just the thread's two endpoint nodes leaves its handle the only thing there to grab.
+  const threadEndpointIds = new Set();
+  if (threadTarget && threadTarget.type === 'tree') {
+    const selLink = links.find(l => l.target.data.nodeRef && l.target.data.nodeRef.id === threadTarget.id);
+    // .data.id (not .data.nodeRef.id) — a top-level topic's own incoming link comes from the
+    // project ROOT, which has no nodeRef at all, so reading .nodeRef.id off it throws. Root
+    // nodes never have a drag-handle to hide in the first place, so including its plain
+    // .data.id here is harmless — it just never matches any topic's id.
+    if (selLink) { threadEndpointIds.add(selLink.source.data.id); threadEndpointIds.add(selLink.target.data.id); }
+  } else if (threadTarget && threadTarget.type === 'conn') {
+    const conn = (m.connections || []).find(c => c.id === threadTarget.id);
+    if (conn) { threadEndpointIds.add(conn.a); threadEndpointIds.add(conn.b); }
+  }
+
   const nodeMerged = node.merge(nodeEnter);
   nodeMerged.transition().duration(duration).style('opacity', 1).attr('transform', d => `translate(${d.y},${d.x})`);
   nodeMerged.select('.anchor-ring').attr('stroke-opacity', d => isAnchor(d, m) ? 0.9 : 0);
@@ -1794,7 +1942,7 @@ function mapUpdate(source) {
     // Committed (locked) nodes keep their full color and stay draggable — only content
     // editing (text/date/kind/bullets/delete) is frozen, so the lock badge alone marks it.
     g.select('.editable-label').style('cursor', canEditNode(n) ? 'text' : 'default');
-    g.select('.drag-handle').style('display', canEditBoard() ? null : 'none');
+    g.select('.drag-handle').style('display', (canEditBoard() && !threadEndpointIds.has(n.id)) ? null : 'none');
     g.select('.lock-badge').attr('x', -12).attr('y', -d.cellHeight / 2 + 3)
       .style('display', isNodeLocked(n) ? 'block' : 'none');
   });
