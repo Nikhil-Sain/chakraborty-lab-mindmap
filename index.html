@@ -14,7 +14,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .hdr-spacer{flex:1}
 .btn-hdr{padding:6px 12px;margin-left:8px;border-radius:8px;border:1.5px solid rgba(255,255,255,.3);background:rgba(255,255,255,.12);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
 .btn-hdr:hover{background:rgba(255,255,255,.22)}
-.admin-badge{background:#ede9fe;border-color:#c4b5fd;color:#6d28d9;cursor:default}
+.admin-badge{background:#ede9fe;border-color:#c4b5fd;color:#6d28d9}
 .admin-preview-active{background:#fef3c7;border-color:#fbbf24;color:#92400e}
 .admin-preview-active:hover{background:#fde68a}
 
@@ -80,7 +80,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .thread-color-input::-moz-color-swatch{border:none;border-radius:4px}
 .filter-menu{position:fixed;display:none;flex-direction:column;gap:2px;background:#ffffff;border:1px solid #e0e7ff;padding:8px;border-radius:12px;z-index:150;box-shadow:0 12px 28px rgba(67,56,202,.18);min-width:190px;max-height:320px;overflow-y:auto}
 .filter-menu.open{display:flex}
-.filter-menu-section{font-size:10px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#9ca3af;padding:6px 6px 3px}
+.filter-menu-section{font-size:10px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#9ca3af;padding:6px 6px 3px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.filter-menu-selectall{font-size:10px;font-weight:800;letter-spacing:normal;text-transform:none;color:#7c3aed;background:none;border:none;cursor:pointer;font-family:inherit;padding:0}
+.filter-menu-selectall:hover{text-decoration:underline}
 .filter-menu-section:not(:first-child){margin-top:4px;border-top:1px solid #f1f2f6;padding-top:8px}
 .filter-menu-row{display:flex;align-items:center;gap:7px;padding:5px 6px;border-radius:7px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;white-space:nowrap}
 .filter-menu-row:hover{background:#f3f4f6}
@@ -90,6 +92,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .filter-menu-del{border:none;background:none;color:#9ca3af;cursor:pointer;font-size:12px;padding:2px 4px;border-radius:5px;line-height:1}
 .filter-menu-del:hover{background:#fee2e2;color:#991b1b}
 .filter-menu-empty{font-size:11.5px;color:#9ca3af;padding:5px 6px}
+.admin-menu-btn{width:100%;border:none;background:none;text-align:left;font-family:inherit}
+.ac-mode-btn{padding:10px 12px;border-radius:8px;border:1.5px solid #e5e7eb;background:#f9fafb;color:#374151;font-size:12.5px;font-weight:600;cursor:pointer;text-align:left;font-family:inherit}
+.ac-mode-btn:hover{background:#f3f4f6}
+.ac-mode-btn.active{background:#ede9fe;border-color:#7c3aed;color:#4c1d95}
 .toolbar-hint{font-size:11px;color:#9ca3af}
 .node-actions{display:none;align-items:center;gap:8px;margin-left:auto}
 .node-actions.visible{display:flex}
@@ -208,9 +214,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 <div class="hdr">
   <div class="hdr-logo">🔬 Chakraborty Research Lab</div>
   <div class="hdr-spacer"></div>
-  <span class="btn-hdr admin-badge" id="admin-badge" style="display:none">🔓 Admin</span>
-  <button class="btn-hdr" id="btn-admin-preview" onclick="toggleAdminPreview()" style="display:none" title="Switch between your admin view and seeing/working the board as a regular member would">👤 View as Member</button>
+  <button class="btn-hdr" id="btn-admin-menu" onclick="toggleAdminMenu(event)" style="display:none">⚙ Admin Controls ▾</button>
   <button class="btn-hdr" id="btn-manage-members" onclick="openMemberManager()" style="display:none">👥 Manage Members</button>
+  <button class="btn-hdr admin-badge" id="btn-admin-preview" onclick="toggleAdminPreview()" style="display:none" title="Click to switch between your admin view and seeing/working the board as a regular member would">🔓 Admin</button>
   <button class="btn-hdr" id="btn-sign-out" onclick="handleSignOut()" style="display:none">🚪 Sign Out</button>
 </div>
 
@@ -327,6 +333,36 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 
 <!-- ── MAP FILTERS (which projects show, plus room for more filter kinds later) ── -->
 <div id="filter-menu" class="filter-menu"></div>
+
+<!-- ── ADMIN CONTROLS ▾ MENU (header dropdown — currently just data entry controls, room for more later) ── -->
+<div id="admin-menu" class="filter-menu"></div>
+
+<!-- ── ADMIN CONTROLS: which dates a member can use for new entries ── -->
+<div class="overlay" id="ov-admin-controls">
+  <div class="modal">
+    <h3 id="ac-title">📅 Data entry controls</h3>
+    <div class="fg">
+      <label>Which dates can they use for new entries?</label>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <button class="ac-mode-btn" data-mode="none" onclick="setDateRestrictionMode('none')">No restriction — any date</button>
+        <button class="ac-mode-btn" data-mode="thisAndNextWeek" onclick="setDateRestrictionMode('thisAndNextWeek')">This week and next week</button>
+        <button class="ac-mode-btn" data-mode="sinceCommit" onclick="setDateRestrictionMode('sinceCommit')">From their last commit onward</button>
+        <button class="ac-mode-btn" data-mode="custom" onclick="setDateRestrictionMode('custom')">Custom range</button>
+      </div>
+    </div>
+    <div class="fg" id="ac-custom-range" style="display:none">
+      <label>Custom range</label>
+      <div style="display:flex;gap:6px">
+        <input type="date" id="ac-start-date" onchange="updateCustomDateRestriction()" style="flex:1;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:7px;font-size:13px;font-family:inherit">
+        <input type="date" id="ac-end-date" onchange="updateCustomDateRestriction()" style="flex:1;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:7px;font-size:13px;font-family:inherit">
+      </div>
+    </div>
+    <div style="font-size:11px;color:#9ca3af;margin-bottom:14px" id="ac-effective-note"></div>
+    <div class="modal-footer">
+      <button class="btn btn-save" onclick="closeAdminControls()">Done</button>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 
@@ -457,6 +493,33 @@ function isNodeLocked(node) {
   return (node.createdAt || 0) <= m.committedAt;
 }
 function canEditNode(node) { return canEditBoard() && !isNodeLocked(node); }
+// ── ADMIN CONTROLS: which calendar dates a member is allowed to use for their own entries ──
+// Stored per member (like committedAt/isAdmin) rather than as one lab-wide setting, since
+// "since last commit" only means anything relative to THAT member's own commit history
+// anyway — admin sets it per board, same place they already review and commit from.
+function dateRestrictionBounds(m) {
+  const dr = m && m.dateRestriction;
+  if (!dr || dr.mode === 'none') return { min: null, max: null };
+  if (dr.mode === 'thisAndNextWeek') {
+    const now = weekOfYear(todayStr());
+    const nextWeekEnd = new Date(now.weekEnd);
+    nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
+    return { min: dateToStr(now.weekStart), max: dateToStr(nextWeekEnd) };
+  }
+  if (dr.mode === 'sinceCommit') {
+    const min = m.committedAt ? new Date(m.committedAt).toISOString().slice(0, 10) : null;
+    return { min, max: null };
+  }
+  if (dr.mode === 'custom') return { min: dr.start || null, max: dr.end || null };
+  return { min: null, max: null };
+}
+function isDateAllowed(m, dateStr) {
+  if (isAdmin || !m || !dateStr) return true;
+  const { min, max } = dateRestrictionBounds(m);
+  if (min && dateStr < min) return false;
+  if (max && dateStr > max) return false;
+  return true;
+}
 let nodeModalCallback = null;
 let mapRoot = null, mapZoom = null, mapSvgSel = null, mapInner = null, mapNodePositions = {}, mapNodeId = 0;
 let connectFromId = null, detailTopicId = null;
@@ -704,6 +767,13 @@ function reconcileViewAfterDataChange() {
   viewMemberId = (mine && data.members.some(m => m.id === mine)) ? mine : (data.members[0] ? data.members[0].id : null);
 }
 const todayStr = () => new Date().toISOString().slice(0, 10);
+// toISOString() converts to UTC first, which can shift a local calendar date across the
+// midnight boundary — fine for todayStr() above (that's the existing convention here), but
+// wrong for turning a week's own Date objects (already local-time, from sundayOf()) back
+// into a 'YYYY-MM-DD' string, where the local calendar date is exactly what's wanted.
+function dateToStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 const initials = s => (s || '').slice(0, 2).toUpperCase();
 const truncate = (s, n) => (s && s.length > n) ? s.slice(0, n) + '…' : (s || '');
 function formatDate(iso) {
@@ -977,6 +1047,11 @@ function toggleProjectVisibility(memberId, projectId) {
   renderFilterMenu();
   if (mapRoot) buildD3Map();
 }
+function showAllProjects(memberId) {
+  delete hiddenProjectIds[memberId];
+  renderFilterMenu();
+  if (mapRoot) buildD3Map();
+}
 // ── PROJECT COLLAPSE (shrink a project's lane to a minimal strip, topics hidden but the
 // row itself stays visible — unlike hiding, which drops the project from the map entirely) ──
 function isProjectCollapsed(memberId, projectId) {
@@ -996,17 +1071,18 @@ function renderFilterMenu() {
   const menu = document.getElementById('filter-menu');
   const m = activeMember();
   if (!m || !(m.projects || []).length) { menu.innerHTML = '<div class="filter-menu-empty">No projects yet</div>'; return; }
-  menu.innerHTML = `<div class="filter-menu-section">Projects</div>` + m.projects.map(p => {
+  const anyHidden = m.projects.some(p => isProjectHidden(m.id, p.id));
+  const sectionHeader = `<div class="filter-menu-section"><span>Projects</span>${anyHidden ? `<button class="filter-menu-selectall" onclick="showAllProjects('${m.id}')">Select all</button>` : ''}</div>`;
+  menu.innerHTML = sectionHeader + m.projects.map(p => {
     const count = countTopics(m.topics.filter(t => t.projectId === p.id));
     const checked = !isProjectHidden(m.id, p.id);
-    const collapsed = isProjectCollapsed(m.id, p.id);
-    // Deleting lives on the project's own detail panel (click its smiley) — no need to
-    // duplicate that destructive action here too.
+    // Collapsing lives on the project's own marker on the map (the small ▾/▸ badge on its
+    // smiley) and deleting on its detail panel (click the smiley) — no need to duplicate
+    // either here too.
     return `<label class="filter-menu-row">
       <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleProjectVisibility('${m.id}','${p.id}')">
       <span class="filter-menu-name">${escapeHtml(p.name)}</span>
       <span class="filter-menu-count">${count}</span>
-      <button class="filter-menu-del" title="${collapsed ? 'Expand' : 'Collapse'} project" onclick="event.preventDefault(); event.stopPropagation(); toggleProjectCollapse('${m.id}','${p.id}')">${collapsed ? '▸' : '▾'}</button>
     </label>`;
   }).join('');
 }
@@ -1023,6 +1099,69 @@ function toggleFilterMenu(event) {
   menu.classList.toggle('open', opening);
 }
 document.addEventListener('click', e => { if (!e.target.closest('#filter-menu, #btn-filters')) document.getElementById('filter-menu').classList.remove('open'); });
+
+// ── ADMIN ▾ MENU — a small dropdown off the header button, currently just one item ──
+function toggleAdminMenu(event) {
+  event.stopPropagation();
+  const menu = document.getElementById('admin-menu');
+  const opening = !menu.classList.contains('open');
+  if (opening) {
+    menu.innerHTML = `<button class="filter-menu-row admin-menu-btn" onclick="openAdminControls()">📅 Data entry controls</button>`;
+    const btn = event.currentTarget.getBoundingClientRect();
+    menu.style.left = btn.left + 'px';
+    menu.style.top = (btn.bottom + 6) + 'px';
+  }
+  menu.classList.toggle('open', opening);
+}
+document.addEventListener('click', e => { if (!e.target.closest('#admin-menu, #btn-admin-menu')) document.getElementById('admin-menu').classList.remove('open'); });
+
+// ── ADMIN CONTROLS — which dates the currently-viewed member can use for new entries.
+// Stored on that member's own doc (dateRestriction), same place committedAt/isAdmin live,
+// since "since last commit" is only meaningful relative to that one board's own history.
+function openAdminControls() {
+  const m = activeMember(); if (!m || !isAdmin) return;
+  document.getElementById('admin-menu').classList.remove('open');
+  document.getElementById('ac-title').textContent = `📅 Data entry controls — ${m.name}`;
+  renderAdminControls();
+  document.getElementById('ov-admin-controls').classList.add('open');
+}
+function closeAdminControls() { document.getElementById('ov-admin-controls').classList.remove('open'); }
+function renderAdminControls() {
+  const m = activeMember(); if (!m) return;
+  const dr = m.dateRestriction || { mode: 'none' };
+  document.querySelectorAll('.ac-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === dr.mode));
+  document.getElementById('ac-custom-range').style.display = dr.mode === 'custom' ? 'block' : 'none';
+  document.getElementById('ac-start-date').value = dr.start || '';
+  document.getElementById('ac-end-date').value = dr.end || '';
+  const note = document.getElementById('ac-effective-note');
+  if (dr.mode === 'thisAndNextWeek') {
+    const { min, max } = dateRestrictionBounds(m);
+    note.textContent = `They can only date new entries between ${min} and ${max} (this week and next).`;
+  }
+  else if (dr.mode === 'sinceCommit') {
+    const since = m.committedAt ? new Date(m.committedAt).toISOString().slice(0, 10) : null;
+    note.textContent = since ? `They can only date new entries ${since} or later.` : "This board hasn't been committed yet, so this has no effect until it is.";
+  }
+  else if (dr.mode === 'custom') {
+    note.textContent = dr.start && dr.end ? `They can only date new entries between ${dr.start} and ${dr.end}.` : 'Pick a start and end date above to turn this on.';
+  }
+  else note.textContent = 'They can date a new entry however they like.';
+}
+function setDateRestrictionMode(mode) {
+  const m = activeMember(); if (!m || !isAdmin) return;
+  const prev = m.dateRestriction || {};
+  m.dateRestriction = { mode, start: prev.start || null, end: prev.end || null };
+  save();
+  renderAdminControls();
+}
+function updateCustomDateRestriction() {
+  const m = activeMember(); if (!m || !isAdmin) return;
+  const start = document.getElementById('ac-start-date').value || null;
+  const end = document.getElementById('ac-end-date').value || null;
+  m.dateRestriction = { mode: 'custom', start, end };
+  save();
+  renderAdminControls();
+}
 
 // ── NODES ────────────────────────────────────────────────────────────────
 function collectIds(node) {
@@ -1078,7 +1217,14 @@ const NODE_TEXT_MAX_WORDS = 5;
 function openNodeModal(title, initialText, initialDate, cb, kindNode) {
   document.getElementById('nm-title').textContent = title;
   document.getElementById('nm-text').value = initialText || '';
-  document.getElementById('nm-date').value = initialDate || todayStr();
+  const dateInput = document.getElementById('nm-date');
+  dateInput.value = initialDate || todayStr();
+  // The date picker itself refuses out-of-range dates when admin has restricted this
+  // member's board — saveNodeModal() still double-checks before saving, as a backstop for
+  // browsers that allow typing a date in manually past the picker's own min/max.
+  const bounds = dateRestrictionBounds(activeMember());
+  dateInput.min = bounds.min || '';
+  dateInput.max = bounds.max || '';
   nodeModalCallback = cb;
   const kindFg = document.getElementById('nm-kind-fg');
   if (kindNode) { kindFg.style.display = ''; renderKindRow(kindNode.id, kindNode.kind); }
@@ -1094,6 +1240,12 @@ function saveNodeModal() {
   const text = limitWords(document.getElementById('nm-text').value.trim(), NODE_TEXT_MAX_WORDS);
   const dateVal = document.getElementById('nm-date').value;
   if (!text) { alert('Please enter some text.'); return; }
+  if (!isDateAllowed(activeMember(), dateVal)) {
+    const { min, max } = dateRestrictionBounds(activeMember());
+    const range = min && max ? `between ${min} and ${max}` : min ? `on or after ${min}` : `on or before ${max}`;
+    alert(`Your admin has restricted which dates you can use right now — pick a date ${range}.`);
+    return;
+  }
   const cb = nodeModalCallback;
   closeNodeModal();
   if (cb) cb(text, dateVal);
@@ -1374,14 +1526,16 @@ function buildTree(m) {
 // Header controls (Admin badge/Manage Members/Sign Out) live outside the per-board toolbar
 // so they stay reachable even before any member exists — this must not depend on activeMember().
 function updateHeaderControls() {
-  document.getElementById('admin-badge').style.display = isAdmin ? '' : 'none';
+  document.getElementById('btn-admin-menu').style.display = isAdmin ? '' : 'none';
   document.getElementById('btn-manage-members').style.display = isAdmin ? '' : 'none';
   document.getElementById('btn-sign-out').style.display = firebaseUser ? '' : 'none';
-  // Stays visible (and clickable) to a real admin no matter which side of the toggle they're
-  // currently on — that's the only way back once they've switched to the member view.
+  // One button doing double duty as both the status badge and the toggle — stays visible
+  // (and clickable) to a real admin no matter which side they're currently on, since it's
+  // the only way back once they've switched to the member view.
   const previewBtn = document.getElementById('btn-admin-preview');
   previewBtn.style.display = realIsAdmin ? '' : 'none';
-  previewBtn.textContent = adminPreviewAsRegular ? '🔓 Back to Admin View' : '👤 View as Member';
+  previewBtn.textContent = adminPreviewAsRegular ? '👤 Member' : '🔓 Admin';
+  previewBtn.classList.toggle('admin-badge', !adminPreviewAsRegular);
   previewBtn.classList.toggle('admin-preview-active', adminPreviewAsRegular);
   renderMemberSidebar();
 }
@@ -1636,7 +1790,13 @@ function mapUpdate(source) {
     topics.forEach(d => { d.x += laneTop; });
     const topicXs = topics.map(d => d.x);
     pr.y = 150;
-    pr.x = topicXs.length ? (Math.min(...topicXs) + Math.max(...topicXs)) / 2 : laneTop + laneHeight / 2;
+    // A collapsed (or still-empty) lane has no topics to center on, so it falls back to the
+    // middle of its own lane — fine for any later lane, but the very first lane starts right
+    // at y=0, and a short collapsed lane's middle can land above the week header's own
+    // bottom edge, so the emoji creeps up and overlaps the header/Add Project corner. Clamp
+    // it to always clear the header by at least half the emoji's own height.
+    const minRootY = weekHeaderHeight + ROOT_EMOJI_SIZE / 2 + 8;
+    pr.x = topicXs.length ? (Math.min(...topicXs) + Math.max(...topicXs)) / 2 : Math.max(laneTop + laneHeight / 2, minRootY);
     laneBounds.push({ name: pr.data.name, color: PROJECT_LANE_COLORS[i % PROJECT_LANE_COLORS.length], top: laneTop, bottom: laneTop + laneHeight });
     laneCursor = laneTop + laneHeight + laneGap;
   });
