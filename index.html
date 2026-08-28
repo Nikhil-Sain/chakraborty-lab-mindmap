@@ -602,6 +602,13 @@ function isNodeLocked(node) {
   const m = activeMember(); if (!m || !m.committedAt) return false;
   return (node.createdAt || 0) <= m.committedAt;
 }
+// Same rule as isNodeLocked(), applied per description point: a point that existed at the
+// last commit becomes read-only, but a point added afterward stays editable until the next one.
+function isPointLocked(point) {
+  if (isAdmin || !point) return false;
+  const m = activeMember(); if (!m || !m.committedAt) return false;
+  return (point.createdAt || 0) <= m.committedAt;
+}
 function canEditNode(node) { return canEditBoard() && !isNodeLocked(node); }
 // Pure review status — unlike isNodeLocked(), this never bypasses for admin, since admin is
 // exactly who needs to see it: which entries are still pending their commit (red) vs already
@@ -1020,7 +1027,13 @@ async function handleAuthChange(user) {
     // snapshot after signing in, when switchViewMember() was never called for this board.
     const cur = activeMember();
     if (cur && !lastSnapshotByMember[cur.id]) snapshotBaseline(cur);
-    renderAll();
+    // A snapshot fired by our own not-yet-acknowledged write is just an echo of what's
+    // already in memory — the local mutation already updated the DOM directly (or, for
+    // things like an in-progress description edit, deliberately didn't re-render so the
+    // open panel and focused field aren't disturbed). Running the full render here too would
+    // undo that and blow away whatever's mid-edit. Only a genuine change from elsewhere
+    // (another tab, another member, the server ack) needs the full re-render.
+    if (!snapshot.metadata.hasPendingWrites) renderAll();
   }, err => console.error('members listener error', err));
 }
 window.addEventListener('auth-changed', e => handleAuthChange(e.detail));
@@ -1168,6 +1181,12 @@ function migrateData() {
     m.projects.forEach(p => {
       if (!p.points) p.points = (p.description && p.description.trim()) ? [p.description.trim()] : [];
       delete p.description;
+      // Points used to be plain strings. Giving each one a createdAt lets points that existed
+      // at the last commit lock once that commit happens, while points added afterward stay
+      // editable — the same rule topics already follow. A pre-existing plain string predates
+      // this field entirely, so it's backfilled as already-old (createdAt 0) rather than as
+      // newly created just now, which would let it slip past a commit that already happened.
+      p.points = p.points.map(pt => typeof pt === 'string' ? { text: pt, createdAt: 0 } : pt);
     });
     m.topics.forEach(t => { if (!t.projectId) t.projectId = m.projects[0].id; });
     if (!m.lastProjectId || !m.projects.some(p => p.id === m.lastProjectId)) m.lastProjectId = m.projects[0].id;
@@ -1307,7 +1326,7 @@ function saveProjectModal() {
   const name = document.getElementById('pm-name').value.trim();
   if (!name) return;
   const description = document.getElementById('pm-desc').value.trim();
-  const p = { id: genId(), name, points: description ? [description] : [] };
+  const p = { id: genId(), name, points: description ? [{ text: description, createdAt: Date.now() }] : [] };
   m.projects.push(p);
   m.lastProjectId = p.id;
   m.lastTopicId = null;
@@ -1731,13 +1750,17 @@ function showRootDetail(m, projectId) {
   // project by replacing it with a fresh blank one, so admin can always delete any of them.
   const canDelete = isAdmin;
   const editable = canEditBoard();
-  const points = (p.points || []).filter(pt => pt && pt.trim());
-  const pointsRows = (p.points || []).map((pt, i) => `
+  const points = (p.points || []).filter(pt => pt && pt.text && pt.text.trim());
+  const pointsRows = (p.points || []).map((pt, i) => {
+    const locked = isPointLocked(pt);
+    const canEditPoint = editable && !locked;
+    return `
       <div class="bullet-row">
         <span class="bullet-mark">•</span>
-        <textarea class="bullet-textarea pd-textarea" data-idx="${i}" rows="1" placeholder="Type a point…" oninput="autoGrowTextarea(this); updateProjectPoint('${p.id}', ${i}, this.value)"${editable ? '' : ' readonly'}>${escapeHtml(pt)}</textarea>
-        ${editable ? `<span class="pd-remove" onclick="removeProjectPoint('${p.id}', ${i})" title="Remove this point">✕</span>` : ''}
-      </div>`).join('');
+        <textarea class="bullet-textarea pd-textarea" data-idx="${i}" rows="1" placeholder="Type a point…" oninput="autoGrowTextarea(this); updateProjectPoint('${p.id}', ${i}, this.value)"${canEditPoint ? '' : ' readonly'}>${escapeHtml(pt.text)}</textarea>
+        ${canEditPoint ? `<span class="pd-remove" onclick="removeProjectPoint('${p.id}', ${i})" title="Remove this point">✕</span>` : ''}
+      </div>`;
+  }).join('');
   document.getElementById('detail-content').innerHTML = `
     <div class="d-title">${escapeHtml(p.name)}</div>
     <div class="d-date">👤 ${escapeHtml(m.name)} · ${count} topic${count !== 1 ? 's' : ''} total</div>
@@ -1758,7 +1781,7 @@ function addProjectPoint(id) {
   const m = activeMember(); if (!m || !canEditBoard()) return;
   const p = m.projects.find(x => x.id === id); if (!p) return;
   p.points = p.points || [];
-  p.points.push('');
+  p.points.push({ text: '', createdAt: Date.now() });
   save();
   showRootDetail(m, id);
   const areas = document.querySelectorAll('#detail-content .pd-textarea');
@@ -1768,12 +1791,14 @@ function addProjectPoint(id) {
 function updateProjectPoint(id, idx, value) {
   const m = activeMember(); if (!m || !canEditBoard()) return;
   const p = m.projects.find(x => x.id === id); if (!p || !p.points) return;
-  p.points[idx] = value;
+  if (isPointLocked(p.points[idx])) return;
+  p.points[idx].text = value;
   save();
 }
 function removeProjectPoint(id, idx) {
   const m = activeMember(); if (!m || !canEditBoard()) return;
   const p = m.projects.find(x => x.id === id); if (!p || !p.points) return;
+  if (isPointLocked(p.points[idx])) return;
   p.points.splice(idx, 1);
   save();
   showRootDetail(m, id);
