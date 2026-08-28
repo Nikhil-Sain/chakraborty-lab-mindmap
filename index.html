@@ -1799,6 +1799,7 @@ function removeProjectPoint(id, idx) {
   const m = activeMember(); if (!m || !canEditBoard()) return;
   const p = m.projects.find(x => x.id === id); if (!p || !p.points) return;
   if (isPointLocked(p.points[idx])) return;
+  if (isAdmin && !confirm('Delete this description point? This cannot be undone.')) return;
   p.points.splice(idx, 1);
   save();
   showRootDetail(m, id);
@@ -1988,6 +1989,7 @@ function changeAvatar(id) {
 }
 function removeAvatar(id) {
   if (!(isAdmin || id === myMemberId())) return;
+  if (isAdmin && !confirm('Remove this profile picture?')) return;
   pushMemberPatch(id, { avatar: null });
   renderMemberSidebar();
 }
