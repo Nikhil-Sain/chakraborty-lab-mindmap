@@ -52,13 +52,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .btn-toolbar:disabled{opacity:.4;cursor:not-allowed;background:#7c3aed}
 .add-project-corner:hover rect{fill:#f2e8fe}
 .btn-toolbar:disabled:hover{background:#7c3aed}
-/* Commit gets its own color instead of the generic toolbar purple — a solid, inviting green
-   while there's something new since the last commit waiting on it, fading to transparent
-   once it's all caught up so it stops competing for attention when there's nothing to do. */
-.btn-commit-needed{background:#22c55e;color:#fff}
-.btn-commit-needed:hover{background:#16a34a}
-.btn-commit-done{background:transparent;color:#16a34a;border:1.5px solid #bbf7d0}
-.btn-commit-done:hover{background:#f0fdf4}
+/* Commit gets its own solid green instead of the generic toolbar purple — which specific
+   entries still need it is now down to the red/yellow dot on each one, not the button. */
+#btn-commit{background:#22c55e;color:#fff}
+#btn-commit:hover{background:#16a34a}
 /* Export/Import get their own colors too, distinct from the generic toolbar purple and
    from each other, so the two opposite-direction actions read apart at a glance. */
 #btn-export{background:#2563eb}
@@ -539,6 +536,13 @@ function isNodeLocked(node) {
   return (node.createdAt || 0) <= m.committedAt;
 }
 function canEditNode(node) { return canEditBoard() && !isNodeLocked(node); }
+// Pure review status — unlike isNodeLocked(), this never bypasses for admin, since admin is
+// exactly who needs to see it: which entries are still pending their commit (red) vs already
+// locked in (yellow), independent of whether admin could still edit either one.
+function nodeIsCommitted(node) {
+  const m = activeMember();
+  return !!(node && m && m.committedAt && (node.createdAt || 0) <= m.committedAt);
+}
 // ── ADMIN CONTROLS: which calendar dates a member is allowed to use for their own entries ──
 // Stored per member (like committedAt/isAdmin) rather than as one lab-wide setting, since
 // "since last commit" only means anything relative to THAT member's own commit history
@@ -1728,11 +1732,7 @@ function updateToolbarHint() {
   ['btn-add-node', 'btn-add-sub', 'btn-add-subsub'].forEach(id => {
     document.getElementById(id).disabled = !editable;
   });
-  const commitBtn = document.getElementById('btn-commit');
-  commitBtn.style.display = isAdmin ? '' : 'none';
-  const needsCommit = memberNeedsReview(m);
-  commitBtn.classList.toggle('btn-commit-needed', needsCommit);
-  commitBtn.classList.toggle('btn-commit-done', !needsCommit);
+  document.getElementById('btn-commit').style.display = isAdmin ? '' : 'none';
   // Export is available to a member on their own board too (just their own data, not
   // everyone's — see exportData()) — Import stays admin-only, since it overwrites whatever
   // board is on screen and shouldn't be something a member can trigger even on themselves.
@@ -2219,9 +2219,21 @@ function mapUpdate(source) {
   dragHandle.append('text').attr('class', 'drag-handle-arrow').attr('x', -13).attr('y', 4)
     .attr('text-anchor', 'middle').attr('font-size', 8).attr('fill', '#1e293b')
     .style('pointer-events', 'none').style('user-select', 'none').text('◀');
-  dragHandle.append('text').attr('class', 'drag-handle-face').attr('x', -3).attr('y', 4)
-    .attr('text-anchor', 'middle').attr('font-size', 12)
-    .style('pointer-events', 'none').style('user-select', 'none').text('🙂');
+  // A plain emoji glyph can't be recolored (browsers render it from a fixed-color emoji
+  // font), so the grip's face is drawn as real SVG shapes instead — its fill can then double
+  // as a per-entry review-status color: red while new since the last commit, yellow once
+  // committed and locked in. Visible to admin too, who bypasses the lock itself but still
+  // needs to see review status at a glance.
+  // y=1, not 4 — the ◀/▶ arrow glyphs sit at y=4 as a text-baseline coordinate, which renders
+  // their visual center a few px above that; a plain circle's cy has no such offset, so
+  // matching y=4 literally lands the face a few px too low next to them.
+  const face = dragHandle.append('g').attr('class', 'drag-handle-face')
+    .attr('transform', 'translate(-3,1)').style('pointer-events', 'none').style('user-select', 'none');
+  face.append('circle').attr('class', 'drag-handle-face-bg').attr('r', 6).attr('stroke', '#fff').attr('stroke-width', 1);
+  face.append('circle').attr('cx', -2).attr('cy', -1.5).attr('r', 0.9).attr('fill', '#1e293b');
+  face.append('circle').attr('cx', 2).attr('cy', -1.5).attr('r', 0.9).attr('fill', '#1e293b');
+  face.append('path').attr('d', 'M -2.5,1.3 Q 0,3.3 2.5,1.3').attr('stroke', '#1e293b').attr('stroke-width', 0.9).attr('fill', 'none').attr('stroke-linecap', 'round');
+  face.append('title');
   dragHandle.append('text').attr('class', 'drag-handle-arrow').attr('x', 7).attr('y', 4)
     .attr('text-anchor', 'middle').attr('font-size', 8).attr('fill', '#1e293b')
     .style('pointer-events', 'none').style('user-select', 'none').text('▶');
@@ -2230,6 +2242,8 @@ function mapUpdate(source) {
     .style('pointer-events', 'none').style('user-select', 'none').text('▼');
   dragHandle.append('title').text("Drag to reposition anywhere within this cell's week · double-click to reset to automatic placement");
   tE.append('circle').attr('class', 'has-content-dot').attr('r', 3.5).attr('fill', '#4f46e5').attr('stroke', '#fff').attr('stroke-width', 1).style('display', 'none');
+  // Review status, always shown (even to admin, who bypasses the actual edit-lock) — red
+  // while it's new since the last commit, yellow once it's been committed and locked in. A
   tE.append('text').attr('class', 'lock-badge').attr('font-size', 11).style('pointer-events', 'none').style('display', 'none').text('🔒');
   tE.append('foreignObject').attr('class', 'desc-card').attr('width', 220).attr('height', 190).attr('y', -20).style('display', 'none')
     .on('mouseenter', () => cancelHideHoverCard())
@@ -2288,6 +2302,9 @@ function mapUpdate(source) {
     g.select('.drag-handle').style('display', (canEditBoard() && !threadEndpointIds.has(n.id)) ? null : 'none');
     g.select('.lock-badge').attr('x', -12).attr('y', -d.cellHeight / 2 + 3)
       .style('display', isNodeLocked(n) ? 'block' : 'none');
+    const committed = nodeIsCommitted(n);
+    g.select('.drag-handle-face-bg').attr('fill', committed ? '#facc15' : '#ef4444');
+    g.select('.drag-handle-face title').text(committed ? 'Committed — locked in' : 'Not yet committed — awaiting admin review');
   });
   node.exit().transition().duration(duration).style('opacity', 0)
     .attr('transform', () => `translate(${source.y},${source.x})`).remove();
