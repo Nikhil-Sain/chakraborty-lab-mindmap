@@ -1114,7 +1114,7 @@ function addProject() {
   save(); buildD3Map();
 }
 function deleteProject(id) {
-  const m = activeMember(); if (!m || !canEditBoard()) return;
+  const m = activeMember(); if (!m || !isAdmin) return;
   if (m.projects.length <= 1) { alert('A member must have at least one project.'); return; }
   const p = m.projects.find(x => x.id === id); if (!p) return;
   if (!confirm(`Delete project "${p.name}" and all its topics? This cannot be undone.`)) return;
@@ -1515,7 +1515,9 @@ function showRootDetail(m, projectId) {
   const p = m.projects.find(pr => pr.id === projectId); if (!p) return;
   document.getElementById('detail-panel').classList.add('open');
   const count = countTopics(m.topics.filter(t => t.projectId === p.id));
-  const canDelete = m.projects.length > 1;
+  // Deleting a project is destructive lab-wide data, not a personal editing action — admin
+  // only, same as Commit/Manage Members/Data entry controls, regardless of whose board it is.
+  const canDelete = isAdmin && m.projects.length > 1;
   const editable = canEditBoard();
   document.getElementById('detail-content').innerHTML = `
     <div class="d-title">${escapeHtml(p.name)}</div>
