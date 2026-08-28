@@ -201,6 +201,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .btn-dismiss:hover{background:#e5e7eb}
 .btn-save{background:#7c3aed;color:#fff}
 .btn-save:hover{background:#6d28d9}
+#dc-confirm-btn:hover{background:#b91c1c}
 
 /* ── Inline description card (on the node itself) — a bullet-point list ── */
 .desc-card-inner{background:linear-gradient(160deg,#1e1b4b,#312e81);border:1.5px solid #818cf8;border-radius:8px;padding:8px;box-shadow:0 14px 30px rgba(49,46,129,.4),0 4px 12px rgba(0,0,0,.2);max-height:220px;overflow-y:auto;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif}
@@ -383,6 +384,23 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
     <div class="modal-footer">
       <button class="btn btn-dismiss" onclick="closeImportConfirm()">Cancel</button>
       <button class="btn btn-save" id="ic-confirm-btn" onclick="confirmImportWithPassword()">Overwrite and Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ADMIN DELETE CONFIRMATION: re-enter your password before any admin deletion ── -->
+<div class="overlay" id="ov-delete-confirm">
+  <div class="modal">
+    <h3>🔐 Confirm Delete</h3>
+    <div class="login-error show" style="background:#fef3c7;color:#92400e;margin-bottom:14px" id="dc-message"></div>
+    <div class="fg">
+      <label>Re-enter your password to confirm</label>
+      <input type="password" id="dc-password" autocomplete="current-password">
+    </div>
+    <div class="login-error" id="dc-error"></div>
+    <div class="modal-footer">
+      <button class="btn btn-dismiss" onclick="closeDeleteConfirm()">Cancel</button>
+      <button class="btn btn-save" id="dc-confirm-btn" style="background:#dc2626" onclick="confirmDeleteWithPassword()">Delete</button>
     </div>
   </div>
 </div>
@@ -803,6 +821,44 @@ async function confirmImportWithPassword() {
   btn.disabled = false;
   closeImportConfirm();
   renderAll();
+}
+// Any admin deletion (a node at any depth, a project, a description point) re-proves the
+// admin's own password first, the same speed bump Import already uses — a plain confirm()
+// is too easy to click through by reflex when the action is this destructive. `pendingDeleteAction`
+// holds the actual deletion, run only once the password checks out.
+let pendingDeleteAction = null;
+function openDeleteConfirm(message, action) {
+  pendingDeleteAction = action;
+  document.getElementById('dc-message').textContent = message;
+  document.getElementById('dc-password').value = '';
+  document.getElementById('dc-error').classList.remove('show');
+  document.getElementById('ov-delete-confirm').classList.add('open');
+  setTimeout(() => document.getElementById('dc-password').focus(), 50);
+}
+function closeDeleteConfirm() {
+  pendingDeleteAction = null;
+  document.getElementById('ov-delete-confirm').classList.remove('open');
+}
+async function confirmDeleteWithPassword() {
+  const errEl = document.getElementById('dc-error');
+  errEl.classList.remove('show');
+  if (!pendingDeleteAction || !isAdmin) { closeDeleteConfirm(); return; }
+  const password = document.getElementById('dc-password').value;
+  if (!password) { errEl.textContent = 'Enter your password to confirm.'; errEl.classList.add('show'); return; }
+  const btn = document.getElementById('dc-confirm-btn');
+  btn.disabled = true;
+  try {
+    await window.fbReauthenticate(firebaseUser.email, password);
+  } catch (e) {
+    btn.disabled = false;
+    errEl.textContent = 'Incorrect password — nothing was deleted.';
+    errEl.classList.add('show');
+    return;
+  }
+  const action = pendingDeleteAction;
+  btn.disabled = false;
+  closeDeleteConfirm();
+  action();
 }
 function undo() {
   const m = activeMember(); if (!m) return;
@@ -1336,27 +1392,28 @@ function saveProjectModal() {
 function deleteProject(id) {
   const m = activeMember(); if (!m || !isAdmin) return;
   const p = m.projects.find(x => x.id === id); if (!p) return;
-  if (!confirm(`Delete project "${p.name}" and all its topics? This cannot be undone.`)) return;
-  let removedIds = [];
-  m.topics.filter(t => t.projectId === id).forEach(t => { removedIds = removedIds.concat(collectIds(t)); });
-  pruneConnections(m, removedIds);
-  m.topics = m.topics.filter(t => t.projectId !== id);
-  m.projects = m.projects.filter(x => x.id !== id);
-  if (!m.projects.length) {
-    // Admin can delete a member's only remaining project — but leaving them with zero
-    // projects would break anything that assumes at least one exists (adding a node, the
-    // Filters panel, ...), so a fresh blank one takes its place instead of the board just
-    // ending up in a broken state.
-    const freshId = genId();
-    m.projects.push({ id: freshId, name: 'New Project' });
-    m.lastProjectId = freshId;
-  } else if (m.lastProjectId === id) {
-    m.lastProjectId = m.projects[0].id;
-  }
-  if (removedIds.includes(m.lastTopicId)) m.lastTopicId = null;
-  delete hiddenProjectIds[m.id]; // stale ids in a Set are harmless, but no reason to keep them
-  save(); closeDetail(); buildD3Map();
-  renderFilterMenu();
+  openDeleteConfirm(`Delete project "${p.name}" and all its topics? This cannot be undone.`, () => {
+    let removedIds = [];
+    m.topics.filter(t => t.projectId === id).forEach(t => { removedIds = removedIds.concat(collectIds(t)); });
+    pruneConnections(m, removedIds);
+    m.topics = m.topics.filter(t => t.projectId !== id);
+    m.projects = m.projects.filter(x => x.id !== id);
+    if (!m.projects.length) {
+      // Admin can delete a member's only remaining project — but leaving them with zero
+      // projects would break anything that assumes at least one exists (adding a node, the
+      // Filters panel, ...), so a fresh blank one takes its place instead of the board just
+      // ending up in a broken state.
+      const freshId = genId();
+      m.projects.push({ id: freshId, name: 'New Project' });
+      m.lastProjectId = freshId;
+    } else if (m.lastProjectId === id) {
+      m.lastProjectId = m.projects[0].id;
+    }
+    if (removedIds.includes(m.lastTopicId)) m.lastTopicId = null;
+    delete hiddenProjectIds[m.id]; // stale ids in a Set are harmless, but no reason to keep them
+    save(); closeDetail(); buildD3Map();
+    renderFilterMenu();
+  });
 }
 
 // ── PROJECT VISIBILITY (which projects show on the map — a display filter, never saved) ──
@@ -1607,7 +1664,9 @@ document.getElementById('ov-node').addEventListener('click', e => { if (e.target
 document.getElementById('ov-connect').addEventListener('click', e => { if (e.target.id === 'ov-connect') closeConnectModal(); });
 document.getElementById('ov-import-confirm').addEventListener('click', e => { if (e.target.id === 'ov-import-confirm') closeImportConfirm(); });
 document.getElementById('ic-password').addEventListener('keydown', e => { if (e.key === 'Enter') confirmImportWithPassword(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeNodeModal(); closeConnectModal(); closeImportConfirm(); } });
+document.getElementById('ov-delete-confirm').addEventListener('click', e => { if (e.target.id === 'ov-delete-confirm') closeDeleteConfirm(); });
+document.getElementById('dc-password').addEventListener('keydown', e => { if (e.key === 'Enter') confirmDeleteWithPassword(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeNodeModal(); closeConnectModal(); closeImportConfirm(); closeDeleteConfirm(); } });
 
 const KIND_LABEL = { node: 'Node', sub: 'Sub Node', subsub: 'Micro Node' };
 // All three buttons attach the new entry to whatever is currently selected (the anchor) —
@@ -1664,15 +1723,19 @@ function deleteNode(id) {
   const msg = kids.length
     ? `Delete "${node.text}"? Its ${kids.length} sub-node${kids.length !== 1 ? 's' : ''} will move up in its place.`
     : `Delete "${node.text}"?`;
+  const doDelete = () => {
+    pruneConnections(m, [id]);
+    // A top-level topic carries its project on itself (its parent array is m.topics, not
+    // another node's children) — promoted children need that same projectId, or they'd be
+    // silently filtered out of every project (i.e. vanish from the map) once spliced in.
+    if (node.projectId) kids.forEach(k => { k.projectId = node.projectId; });
+    arr.splice(idx, 1, ...kids);
+    if (m.lastTopicId === id) m.lastTopicId = null;
+    save(); closeDetail(); buildD3Map();
+  };
+  if (isAdmin) { openDeleteConfirm(msg, doDelete); return; }
   if (!confirm(msg)) return;
-  pruneConnections(m, [id]);
-  // A top-level topic carries its project on itself (its parent array is m.topics, not
-  // another node's children) — promoted children need that same projectId, or they'd be
-  // silently filtered out of every project (i.e. vanish from the map) once spliced in.
-  if (node.projectId) kids.forEach(k => { k.projectId = node.projectId; });
-  arr.splice(idx, 1, ...kids);
-  if (m.lastTopicId === id) m.lastTopicId = null;
-  save(); closeDetail(); buildD3Map();
+  doDelete();
 }
 // The Edit/Connect/Delete buttons live in the toolbar now (not the detail panel), so they
 // always act on whichever topic is currently selected rather than a specific baked-in id.
@@ -1799,10 +1862,9 @@ function removeProjectPoint(id, idx) {
   const m = activeMember(); if (!m || !canEditBoard()) return;
   const p = m.projects.find(x => x.id === id); if (!p || !p.points) return;
   if (isPointLocked(p.points[idx])) return;
-  if (isAdmin && !confirm('Delete this description point? This cannot be undone.')) return;
-  p.points.splice(idx, 1);
-  save();
-  showRootDetail(m, id);
+  const doRemove = () => { p.points.splice(idx, 1); save(); showRootDetail(m, id); };
+  if (isAdmin) { openDeleteConfirm('Delete this description point? This cannot be undone.', doRemove); return; }
+  doRemove();
 }
 function showTopicDetail(n) {
   if (!n) return;
