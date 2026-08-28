@@ -214,6 +214,11 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .bullet-add{width:100%;padding:6px;border:1.5px dashed rgba(255,255,255,.32);border-radius:6px;background:transparent;color:rgba(255,255,255,.6);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
 .bullet-add:hover{border-color:#c4b5fd;color:#c4b5fd}
 .bullet-hint{margin-top:6px;font-size:9.5px;color:rgba(255,255,255,.4);text-align:center}
+/* ── Project description points, in the (light) detail panel — same bullet-row layout, dark-panel-safe colors ── */
+.pd-remove{cursor:pointer;color:#9ca3af;font-size:10px;flex-shrink:0;padding:6px 1px 0}
+.pd-remove:hover{color:#f87171}
+.pd-add{width:100%;padding:6px;border:1.5px dashed #c7d2fe;border-radius:6px;background:transparent;color:#7c3aed;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:14px}
+.pd-add:hover{border-color:#818cf8;background:#f5f3ff}
 
 .connect-search{width:100%;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:7px 7px 0 0;border-bottom:none;font-size:13px;font-family:inherit;outline:none}
 .connect-list{max-height:260px;overflow-y:auto;border:1.5px solid #e5e7eb;border-radius:0 0 7px 7px;margin-bottom:14px}
@@ -328,6 +333,25 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
     <div class="modal-footer">
       <button class="btn btn-dismiss" onclick="closeNodeModal()">Cancel</button>
       <button class="btn btn-save" onclick="saveNodeModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ADD PROJECT MODAL ── -->
+<div class="overlay" id="ov-project">
+  <div class="modal">
+    <h3>📁 Add Project</h3>
+    <div class="fg">
+      <label>Name</label>
+      <input id="pm-name" placeholder="Project name">
+    </div>
+    <div class="fg">
+      <label>Description</label>
+      <textarea id="pm-desc" placeholder="What is this project about?" style="min-height:80px"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-dismiss" onclick="closeProjectModal()">Cancel</button>
+      <button class="btn btn-save" onclick="saveProjectModal()">Save</button>
     </div>
   </div>
 </div>
@@ -1139,6 +1163,12 @@ function migrateData() {
       m.projects = [proj];
     }
     delete m.projectName;
+    // Project descriptions used to be one free-text blob; now they're a bullet-point list
+    // the same way topic descriptions are, so an old blob becomes its first point.
+    m.projects.forEach(p => {
+      if (!p.points) p.points = (p.description && p.description.trim()) ? [p.description.trim()] : [];
+      delete p.description;
+    });
     m.topics.forEach(t => { if (!t.projectId) t.projectId = m.projects[0].id; });
     if (!m.lastProjectId || !m.projects.some(p => p.id === m.lastProjectId)) m.lastProjectId = m.projects[0].id;
     backfill(m.topics);
@@ -1263,14 +1293,26 @@ function unlockMemberAdmin(id) {
 
 // ── PROJECTS (each member can run several independent projects, each its own root circle) ──
 function addProject() {
+  if (!canEditBoard()) return;
+  document.getElementById('pm-name').value = '';
+  document.getElementById('pm-desc').value = '';
+  document.getElementById('ov-project').classList.add('open');
+  document.getElementById('pm-name').focus();
+}
+function closeProjectModal() {
+  document.getElementById('ov-project').classList.remove('open');
+}
+function saveProjectModal() {
   const m = activeMember(); if (!m || !canEditBoard()) return;
-  const name = prompt('Project name:', 'New Project');
-  if (name === null || !name.trim()) return;
-  const p = { id: genId(), name: name.trim() };
+  const name = document.getElementById('pm-name').value.trim();
+  if (!name) return;
+  const description = document.getElementById('pm-desc').value.trim();
+  const p = { id: genId(), name, points: description ? [description] : [] };
   m.projects.push(p);
   m.lastProjectId = p.id;
   m.lastTopicId = null;
   save(); buildD3Map();
+  closeProjectModal();
 }
 function deleteProject(id) {
   const m = activeMember(); if (!m || !isAdmin) return;
@@ -1689,9 +1731,19 @@ function showRootDetail(m, projectId) {
   // project by replacing it with a fresh blank one, so admin can always delete any of them.
   const canDelete = isAdmin;
   const editable = canEditBoard();
+  const points = (p.points || []).filter(pt => pt && pt.trim());
+  const pointsRows = (p.points || []).map((pt, i) => `
+      <div class="bullet-row">
+        <span class="bullet-mark">•</span>
+        <textarea class="bullet-textarea pd-textarea" data-idx="${i}" rows="1" placeholder="Type a point…" oninput="autoGrowTextarea(this); updateProjectPoint('${p.id}', ${i}, this.value)"${editable ? '' : ' readonly'}>${escapeHtml(pt)}</textarea>
+        ${editable ? `<span class="pd-remove" onclick="removeProjectPoint('${p.id}', ${i})" title="Remove this point">✕</span>` : ''}
+      </div>`).join('');
   document.getElementById('detail-content').innerHTML = `
     <div class="d-title">${escapeHtml(p.name)}</div>
     <div class="d-date">👤 ${escapeHtml(m.name)} · ${count} topic${count !== 1 ? 's' : ''} total</div>
+    ${(editable || points.length) ? `<div class="d-section">Description</div>` : ''}
+    ${pointsRows ? `<div class="bullet-list">${pointsRows}</div>` : (editable ? '' : '<div style="font-size:11px;color:rgba(255,255,255,.4)">No description yet.</div>')}
+    ${editable ? `<button class="pd-add" type="button" onclick="addProjectPoint('${p.id}')">+ Add more description</button>` : ''}
     ${editable ? `
     <div class="d-section">Start a new branch</div>
     <div style="font-size:11px;color:rgba(255,255,255,.45);line-height:1.5;margin-bottom:4px">Adds a fresh top-level topic directly under this project, separate from any existing trail.</div>
@@ -1699,7 +1751,32 @@ function showRootDetail(m, projectId) {
       <button class="d-btn add" onclick="addNodeOfType('node')">+ Add Node</button>
       ${canDelete ? `<button class="d-btn del" onclick="deleteProject('${p.id}')">✕ Delete Project</button>` : ''}
     </div>` : `<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:6px">👀 Read-only — this isn't your board.</div>`}`;
+  document.querySelectorAll('#detail-content .pd-textarea').forEach(autoGrowTextarea);
   resizeMapForPanel();
+}
+function addProjectPoint(id) {
+  const m = activeMember(); if (!m || !canEditBoard()) return;
+  const p = m.projects.find(x => x.id === id); if (!p) return;
+  p.points = p.points || [];
+  p.points.push('');
+  save();
+  showRootDetail(m, id);
+  const areas = document.querySelectorAll('#detail-content .pd-textarea');
+  const last = areas[areas.length - 1];
+  if (last) last.focus();
+}
+function updateProjectPoint(id, idx, value) {
+  const m = activeMember(); if (!m || !canEditBoard()) return;
+  const p = m.projects.find(x => x.id === id); if (!p || !p.points) return;
+  p.points[idx] = value;
+  save();
+}
+function removeProjectPoint(id, idx) {
+  const m = activeMember(); if (!m || !canEditBoard()) return;
+  const p = m.projects.find(x => x.id === id); if (!p || !p.points) return;
+  p.points.splice(idx, 1);
+  save();
+  showRootDetail(m, id);
 }
 function showTopicDetail(n) {
   if (!n) return;
