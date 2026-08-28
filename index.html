@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Chakraborty Research Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -18,23 +20,46 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .admin-preview-active{background:#fef3c7;border-color:#fbbf24;color:#92400e}
 .admin-preview-active:hover{background:#fde68a}
 
-/* ── Login screen ── */
-.login-overlay{display:none;position:fixed;inset:0;z-index:300;align-items:center;justify-content:center;background:linear-gradient(180deg,#eef2ff 0%,#f6f8fc 100%)}
+/* ── Login screen: eyepiece — a 3D fluorescent neuron scene beside the sign-in card ── */
+.login-overlay{display:none;position:fixed;inset:0;z-index:300;overflow:hidden;background:#050807}
 .login-overlay.open{display:flex}
-.login-box{background:#fff;border-radius:14px;padding:28px;width:320px;max-width:90vw;box-shadow:0 20px 56px rgba(67,56,202,.18)}
-.login-logo{font-size:16px;font-weight:800;color:#1e293b;text-align:center;margin-bottom:18px}
-.login-error{font-size:11.5px;color:#991b1b;background:#fee2e2;border-radius:6px;padding:6px 9px;margin-bottom:10px;display:none}
+.login-visual{position:relative;flex:1.3;min-width:0;background:radial-gradient(circle at 45% 38%,#0e1a17 0%,#070b0a 55%,#000 100%);overflow:hidden}
+.login-visual::before,.login-visual::after{content:'';position:absolute;background:rgba(95,209,197,.12);z-index:1}
+.login-visual::before{left:0;right:0;top:50%;height:1px}
+.login-visual::after{top:0;bottom:0;left:50%;width:1px}
+#login-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:0}
+.login-formpane{flex:0 0 400px;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(165deg,#12100a 0%,#0a0906 100%);border-left:1px solid rgba(232,179,79,.12)}
+@media (max-width:760px){.login-overlay.open{flex-direction:column}.login-visual{flex:1 1 42%}.login-formpane{flex:1 1 58%;width:100%}}
+.login-box{background:linear-gradient(165deg,rgba(26,58,110,.6) 0%,rgba(10,24,46,.72) 100%);border:1px solid rgba(96,165,250,.45);backdrop-filter:blur(6px);border-radius:10px;padding:32px 28px;width:320px;max-width:90vw;box-shadow:0 24px 60px rgba(0,0,0,.45)}
+.login-markline{display:flex;align-items:center;gap:8px;margin-bottom:16px}
+.login-ring{width:14px;height:14px;border-radius:50%;border:1.5px solid #5fd1c5;position:relative;flex-shrink:0}
+.login-ring::before,.login-ring::after{content:'';position:absolute;background:#5fd1c5}
+.login-ring::before{left:50%;top:-4px;bottom:-4px;width:1px;transform:translateX(-50%)}
+.login-ring::after{top:50%;left:-4px;right:-4px;height:1px;transform:translateY(-50%)}
+.login-lockup{font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:#6fe0d2}
+.login-logo{font-family:'Outfit',sans-serif;font-weight:600;font-size:21px;color:#f4faf8;margin:0}
+.login-box .fg label{font-family:'Space Mono',monospace;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:#8fcabe}
+.login-box .fg input{background:transparent;border:none;border-bottom:1px solid rgba(95,209,197,.35);border-radius:0;color:#f4faf8;padding:8px 0;font-family:'Outfit',sans-serif;font-size:15px}
+.login-box .fg input:focus{border-color:#5fd1c5}
+.login-submit{width:100%;border:none;cursor:pointer;font-weight:600;padding:12px;margin-top:8px;background:#5fd1c5;color:#062421;border-radius:3px;font-family:'Space Mono',monospace;font-size:12.5px;letter-spacing:.1em;text-transform:uppercase}
+.login-submit:hover{background:#7fdccf}
+.login-error{font-size:12.5px;color:#f9b4b4;background:rgba(239,68,68,.15);border-radius:6px;padding:7px 10px;margin-bottom:10px;display:none}
 .login-error.show{display:block}
-.login-error.success{color:#166534;background:#dcfce7}
-.login-hint{font-size:10.5px;color:#9ca3af;text-align:center;margin-top:12px;line-height:1.4}
-.login-forgot{display:block;text-align:center;font-size:11px;color:#7c3aed;margin-top:10px;cursor:pointer;background:none;border:none;font-family:inherit;width:100%}
+.login-error.success{color:#a7e8b0;background:rgba(34,197,94,.15)}
+.login-hint{font-size:12px;color:#7fa79c;text-align:center;margin-top:14px;line-height:1.55}
+.login-forgot{display:block;text-align:center;font-size:13px;color:#8fcabe;margin-top:12px;cursor:pointer;background:none;border:none;font-family:inherit;width:100%}
 .login-forgot:hover{text-decoration:underline}
 
 .main{padding:18px;flex:1 1 auto;min-height:0;display:flex;flex-direction:row;gap:12px}
 .main-content{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
 
 /* ── Member sidebar (vertical tabs, one per member, with an optional avatar) ── */
-.member-sidebar{width:92px;flex-shrink:0;display:flex;flex-direction:column;gap:5px;padding:10px 6px;background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(67,56,202,.08);overflow-y:auto}
+.member-sidebar-wrap{width:92px;flex-shrink:0;display:flex;flex-direction:column;gap:8px;min-height:0}
+.member-tab-switch{display:flex;background:#e5e7eb;border-radius:9px;padding:3px;gap:2px;flex-shrink:0}
+.mts-btn{flex:1;padding:6px 2px;border:none;background:none;border-radius:7px;font-size:10px;font-weight:800;color:#6b7280;cursor:pointer;font-family:inherit}
+.mts-btn:hover{color:#4b5563}
+.mts-btn.active{background:#fff;color:#7c3aed;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.member-sidebar{flex:1;min-height:0;display:flex;flex-direction:column;gap:5px;padding:10px 6px;background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(67,56,202,.08);overflow-y:auto}
 .member-tab{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 4px;border-radius:10px;cursor:pointer;text-align:center}
 .member-tab:hover{background:#f3f4f6}
 .member-tab.active{background:#ede9fe}
@@ -162,6 +187,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center}
 .overlay.open{display:flex}
 .modal{background:#fff;border-radius:14px;padding:22px;width:380px;max-width:92vw;box-shadow:0 20px 56px rgba(0,0,0,.18)}
+#ov-members .modal{width:480px}
 .modal h3{font-size:15px;font-weight:700;margin-bottom:14px;color:#1a1a2e}
 .fg{margin-bottom:12px}
 .fg label{display:block;font-size:11px;font-weight:700;color:#374151;margin-bottom:4px}
@@ -206,20 +232,24 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 <body>
 
 <div class="login-overlay" id="login-overlay">
-  <div class="login-box">
-    <div class="login-logo">🔬 Chakraborty Research Lab</div>
-    <div class="fg">
-      <label>Email</label>
-      <input type="email" id="login-email" autocomplete="username">
+  <div class="login-visual" id="login-visual"><canvas id="login-canvas"></canvas></div>
+  <div class="login-formpane">
+    <div class="login-box">
+      <div class="login-markline"><span class="login-ring"></span><span class="login-lockup">Mindmaps</span></div>
+      <div class="login-logo">Chakraborty Research Lab</div>
+      <div class="fg" style="margin-top:16px">
+        <label>Email</label>
+        <input type="email" id="login-email" autocomplete="username">
+      </div>
+      <div class="fg">
+        <label>Password</label>
+        <input type="password" id="login-password" autocomplete="current-password">
+      </div>
+      <div class="login-error" id="login-error"></div>
+      <button class="login-submit" id="login-submit" onclick="handleLoginSubmit()">Sign In</button>
+      <button type="button" class="login-forgot" onclick="handleForgotPassword()">Forgot password?</button>
+      <div class="login-hint">Don't have a login? Ask your lab admin to create one for you.</div>
     </div>
-    <div class="fg">
-      <label>Password</label>
-      <input type="password" id="login-password" autocomplete="current-password">
-    </div>
-    <div class="login-error" id="login-error"></div>
-    <button class="btn btn-save" id="login-submit" onclick="handleLoginSubmit()" style="width:100%">Sign In</button>
-    <button type="button" class="login-forgot" onclick="handleForgotPassword()">Forgot password?</button>
-    <div class="login-hint">Don't have a login? Ask your lab admin to create one for you.</div>
   </div>
 </div>
 
@@ -232,7 +262,13 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 </div>
 
 <div class="main">
-  <div class="member-sidebar" id="member-sidebar"></div>
+  <div class="member-sidebar-wrap">
+    <div class="member-tab-switch">
+      <button class="mts-btn active" id="mts-current" onclick="setMemberTabFilter('current')">Current</button>
+      <button class="mts-btn" id="mts-past" onclick="setMemberTabFilter('past')">Past</button>
+    </div>
+    <div class="member-sidebar" id="member-sidebar"></div>
+  </div>
   <input type="file" id="avatar-file-input" accept="image/*" style="display:none" onchange="handleAvatarFile(event)">
   <div class="main-content">
   <div class="toolbar" id="toolbar">
@@ -369,6 +405,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 
 <!-- ── ADMIN CONTROLS ▾ MENU (header dropdown — currently just data entry controls, room for more later) ── -->
 <div id="admin-menu" class="filter-menu"></div>
+<div id="avatar-menu" class="filter-menu"></div>
 
 <!-- ── ADMIN CONTROLS: which dates a member can use for new entries ── -->
 <div class="overlay" id="ov-admin-controls">
@@ -402,6 +439,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
 <!-- The rest of the app is one big classic (non-module) script, since inline onclick="fn()"
      handlers throughout the HTML need those functions as plain globals — ES modules don't
@@ -509,6 +547,11 @@ let data = { members: [] };
 // user's UID. No more per-browser "pick your name," no more PIN: who you are and whether
 // you're admin are both real, server-known facts, not something a browser session invents.
 let viewMemberId = null;
+// Which half of the sidebar's Current/Past toggle is showing — a personal, per-session view
+// filter (never saved), same treatment as hiddenProjectIds. m.status itself ('current' by
+// default, or 'past' once admin marks someone as no longer active) IS saved, on the member.
+let memberTabFilter = 'current';
+function isMemberCurrent(m) { return (m.status || 'current') !== 'past'; }
 // realIsAdmin is the actual, server-known fact (from the member's own Firestore doc) and
 // never changes just because the UI does — Firestore's own security rules are what actually
 // gate writes, regardless of anything on this page. isAdmin is what the rest of the app
@@ -770,11 +813,119 @@ document.addEventListener('keydown', e => {
 
 // ── AUTH ─────────────────────────────────────────────────────────────────
 let unsubscribeMembers = null;
+let loginScene, loginRenderer, loginCamera, loginGroup, loginAnimId = null, loginAnimateFn = null;
+let loginDragging = false, loginLastX = 0, loginLastY = 0, loginReduced = false;
+function startLoginScene() {
+  if (loginRenderer) { loginAnimateFn(); return; }
+  if (typeof THREE === 'undefined') return;
+  const canvas = document.getElementById('login-canvas');
+  const visualPane = document.getElementById('login-visual');
+  loginReduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  loginScene = new THREE.Scene();
+  loginCamera = new THREE.PerspectiveCamera(50, visualPane.clientWidth / visualPane.clientHeight, 0.1, 100);
+  loginCamera.position.set(0, 0, 17);
+  loginRenderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  loginRenderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  loginRenderer.setSize(visualPane.clientWidth, visualPane.clientHeight);
+  loginRenderer.setClearColor(0x000000, 0);
+
+  loginGroup = new THREE.Group();
+  loginScene.add(loginGroup);
+
+  function glowTexture() {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const ctx = c.getContext('2d');
+    const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, '#FFFFFFFF'); g.addColorStop(0.45, '#FFFFFFAA'); g.addColorStop(1, '#FFFFFF00');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  }
+  const whiteGlow = glowTexture();
+  // Fluorescent Brainbow-style palette — each neuron gets one hue, shuffled so nearby neurons rarely repeat.
+  const PALETTE = ['#3CFF6E', '#FF35D6', '#33E6FF', '#FFE23C', '#FF5A3C', '#8C5CFF', '#2CFFC2', '#FF9C3C'];
+  const order = PALETTE.slice();
+  for (let s = order.length - 1; s > 0; s--) { const j = Math.floor(Math.random() * (s + 1)); const t = order[s]; order[s] = order[j]; order[j] = t; }
+
+  const positions = [], colors = [], boutons = [];
+  function randomAxis() { return new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize(); }
+  function grow(start, dir, length, depth, maxDepth, base, hot) {
+    if (depth <= 0 || length < 0.05) return;
+    const jitter = randomAxis().multiplyScalar(0.4);
+    const newDir = dir.clone().add(jitter).normalize();
+    const end = start.clone().addScaledVector(newDir, length);
+    const depthRatio = 1 - (depth / maxDepth);
+    const col = hot.clone().lerp(base, Math.min(1, depthRatio * 1.4));
+    positions.push(start.x, start.y, start.z, end.x, end.y, end.z);
+    colors.push(col.r, col.g, col.b, col.r, col.g, col.b);
+    if (depth <= 2 && Math.random() < 0.22) boutons.push({ pos: end.clone(), color: base });
+    const children = depth > 4 ? 2 : (Math.random() < 0.6 ? 2 : 1);
+    for (let i = 0; i < children; i++) {
+      const childDir = newDir.clone().applyAxisAngle(randomAxis(), (Math.random() - 0.5) * 1.2);
+      grow(end, childDir, length * 0.74, depth - 1, maxDepth, base, hot);
+    }
+  }
+
+  const NEURONS = 8, MAX_DEPTH = 6;
+  for (let n = 0; n < NEURONS; n++) {
+    let origin;
+    do { origin = new THREE.Vector3(Math.random()*2-1, Math.random()*2-1, Math.random()*2-1); } while (origin.length() > 1);
+    origin.multiplyScalar(6.4);
+    const base = new THREE.Color(order[n % order.length]);
+    const hot = base.clone().lerp(new THREE.Color('#FFFFFF'), 0.55);
+    const soma = new THREE.Mesh(new THREE.SphereGeometry(0.2 + Math.random()*0.1, 14, 12), new THREE.MeshBasicMaterial({ color: hot }));
+    soma.scale.set(1, 1.3, 1);
+    soma.position.copy(origin);
+    loginGroup.add(soma);
+    const primaries = 4 + Math.floor(Math.random()*3);
+    for (let p = 0; p < primaries; p++) grow(origin, randomAxis(), 1.1 + Math.random()*0.5, MAX_DEPTH, MAX_DEPTH, base, hot);
+  }
+
+  const lineGeo = new THREE.BufferGeometry();
+  lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  lineGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  loginGroup.add(new THREE.LineSegments(lineGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending })));
+
+  boutons.forEach(b => {
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: whiteGlow, color: b.color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    spr.position.copy(b.pos);
+    spr.scale.setScalar(0.16 + Math.random()*0.1);
+    loginGroup.add(spr);
+  });
+
+  canvas.addEventListener('pointerdown', e => { loginDragging = true; loginLastX = e.clientX; loginLastY = e.clientY; });
+  window.addEventListener('pointerup', () => { loginDragging = false; });
+  window.addEventListener('pointermove', e => {
+    if (!loginDragging) return;
+    const dx = e.clientX - loginLastX, dy = e.clientY - loginLastY;
+    loginLastX = e.clientX; loginLastY = e.clientY;
+    loginGroup.rotation.y += dx * 0.006;
+    loginGroup.rotation.x = Math.max(-1, Math.min(1, loginGroup.rotation.x + dy * 0.006));
+  });
+  window.addEventListener('resize', () => {
+    if (!loginRenderer) return;
+    loginCamera.aspect = visualPane.clientWidth / visualPane.clientHeight; loginCamera.updateProjectionMatrix();
+    loginRenderer.setSize(visualPane.clientWidth, visualPane.clientHeight);
+  });
+
+  loginAnimateFn = function () {
+    loginAnimId = requestAnimationFrame(loginAnimateFn);
+    if (!loginDragging && !loginReduced) loginGroup.rotation.y += 0.0012;
+    loginRenderer.render(loginScene, loginCamera);
+  };
+  loginAnimateFn();
+}
+function stopLoginScene() {
+  if (loginAnimId) { cancelAnimationFrame(loginAnimId); loginAnimId = null; }
+}
 function showLoginScreen() {
   document.getElementById('login-overlay').classList.add('open');
   document.getElementById('login-error').classList.remove('show', 'success');
+  startLoginScene();
 }
-function hideLoginScreen() { document.getElementById('login-overlay').classList.remove('open'); }
+function hideLoginScreen() {
+  document.getElementById('login-overlay').classList.remove('open');
+  stopLoginScene();
+}
 async function handleLoginSubmit() {
   const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-password').value;
@@ -1035,8 +1186,9 @@ function renderMembersList() {
   const list = document.getElementById('members-list');
   list.innerHTML = data.members.map(m => `
     <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid #e5e7eb;border-radius:8px">
-      <span style="flex:1;font-size:12px;font-weight:700">${escapeHtml(m.name)}${m.committedAt ? ' 🔒' : ''}${m.isAdmin ? ' 🔓' : ''}</span>
+      <span style="flex:1;font-size:12px;font-weight:700">${escapeHtml(m.name)}${!isMemberCurrent(m) ? ' 🕓' : ''}${m.committedAt ? ' 🔒' : ''}${m.isAdmin ? ' 🔓' : ''}</span>
       <button class="mc-btn" onclick="renameMemberAdmin('${m.id}')">Rename</button>
+      <button class="mc-btn" onclick="toggleMemberStatusAdmin('${m.id}')">${isMemberCurrent(m) ? 'Mark as past' : 'Mark as current'}</button>
       <button class="mc-btn" onclick="toggleMemberAdmin('${m.id}')">${m.isAdmin ? 'Remove admin' : 'Make admin'}</button>
       ${m.committedAt ? `<button class="mc-btn" onclick="unlockMemberAdmin('${m.id}')">Unlock</button>` : ''}
       <button class="mc-btn" onclick="removeMemberAdmin('${m.id}')" style="color:#991b1b">Remove</button>
@@ -1088,6 +1240,13 @@ function toggleMemberAdmin(id) {
   pushMemberPatch(id, { isAdmin: !m.isAdmin });
   renderMembersList();
 }
+function toggleMemberStatusAdmin(id) {
+  if (!isAdmin) return;
+  const m = data.members.find(x => x.id === id); if (!m) return;
+  pushMemberPatch(id, { status: isMemberCurrent(m) ? 'past' : 'current' });
+  renderMembersList();
+  renderMemberSidebar();
+}
 async function removeMemberAdmin(id) {
   const m = data.members.find(x => x.id === id); if (!m) return;
   if (!confirm(`Remove "${m.name}"'s profile and all their data? This cannot be undone. (Their login stays valid — remove that separately in the Firebase Console if needed.)`)) return;
@@ -1115,7 +1274,6 @@ function addProject() {
 }
 function deleteProject(id) {
   const m = activeMember(); if (!m || !isAdmin) return;
-  if (m.projects.length <= 1) { alert('A member must have at least one project.'); return; }
   const p = m.projects.find(x => x.id === id); if (!p) return;
   if (!confirm(`Delete project "${p.name}" and all its topics? This cannot be undone.`)) return;
   let removedIds = [];
@@ -1123,7 +1281,17 @@ function deleteProject(id) {
   pruneConnections(m, removedIds);
   m.topics = m.topics.filter(t => t.projectId !== id);
   m.projects = m.projects.filter(x => x.id !== id);
-  if (m.lastProjectId === id) m.lastProjectId = m.projects[0].id;
+  if (!m.projects.length) {
+    // Admin can delete a member's only remaining project — but leaving them with zero
+    // projects would break anything that assumes at least one exists (adding a node, the
+    // Filters panel, ...), so a fresh blank one takes its place instead of the board just
+    // ending up in a broken state.
+    const freshId = genId();
+    m.projects.push({ id: freshId, name: 'New Project' });
+    m.lastProjectId = freshId;
+  } else if (m.lastProjectId === id) {
+    m.lastProjectId = m.projects[0].id;
+  }
   if (removedIds.includes(m.lastTopicId)) m.lastTopicId = null;
   delete hiddenProjectIds[m.id]; // stale ids in a Set are harmless, but no reason to keep them
   save(); closeDetail(); buildD3Map();
@@ -1517,7 +1685,9 @@ function showRootDetail(m, projectId) {
   const count = countTopics(m.topics.filter(t => t.projectId === p.id));
   // Deleting a project is destructive lab-wide data, not a personal editing action — admin
   // only, same as Commit/Manage Members/Data entry controls, regardless of whose board it is.
-  const canDelete = isAdmin && m.projects.length > 1;
+  // No "must keep at least one" floor here — deleteProject() already handles a member's last
+  // project by replacing it with a fresh blank one, so admin can always delete any of them.
+  const canDelete = isAdmin;
   const editable = canEditBoard();
   document.getElementById('detail-content').innerHTML = `
     <div class="d-title">${escapeHtml(p.name)}</div>
@@ -1669,10 +1839,18 @@ function updateHeaderControls() {
 // Vertical tab strip on the left — one entry per member, with their avatar (or initials as
 // a fallback) and a 📷 button on tabs you're allowed to re-picture (your own, or any of
 // them if you're admin).
+function setMemberTabFilter(filter) {
+  memberTabFilter = filter;
+  document.getElementById('mts-current').classList.toggle('active', filter === 'current');
+  document.getElementById('mts-past').classList.toggle('active', filter === 'past');
+  renderMemberSidebar();
+}
 function renderMemberSidebar() {
   const sidebar = document.getElementById('member-sidebar');
   if (!sidebar) return;
-  sidebar.innerHTML = data.members.map(mm => {
+  const wantCurrent = memberTabFilter === 'current';
+  const shown = data.members.filter(mm => isMemberCurrent(mm) === wantCurrent);
+  sidebar.innerHTML = shown.map(mm => {
     const canPic = isAdmin || mm.id === myMemberId();
     const avatarStyle = mm.avatar ? `background-image:url('${mm.avatar}')` : '';
     return `<div class="member-tab${mm.id === viewMemberId ? ' active' : ''}" onclick="switchViewMember('${mm.id}')" title="${escapeHtml(mm.name)}${mm.id === myMemberId() ? ' (me)' : ''}">
@@ -1680,15 +1858,36 @@ function renderMemberSidebar() {
       <span class="member-tab-name">${escapeHtml(truncate(mm.name, 12))}</span>
       ${isAdmin && memberNeedsReview(mm) ? '<span class="member-tab-review">Needs review</span>' : ''}
       ${mm.committedAt ? '<span class="member-tab-lock">🔒</span>' : ''}
-      ${canPic ? `<button class="member-avatar-edit" onclick="event.stopPropagation(); changeAvatar('${mm.id}')" title="Change profile picture">📷</button>` : ''}
+      ${canPic ? `<button class="member-avatar-edit" onclick="toggleAvatarMenu(event, '${mm.id}')" title="Change profile picture">📷</button>` : ''}
     </div>`;
-  }).join('') || '<div class="member-sidebar-empty">No members yet</div>';
+  }).join('') || `<div class="member-sidebar-empty">No ${wantCurrent ? 'current' : 'past'} members</div>`;
 }
+function toggleAvatarMenu(event, id) {
+  event.stopPropagation();
+  const menu = document.getElementById('avatar-menu');
+  const opening = !menu.classList.contains('open');
+  if (opening) {
+    const mm = data.members.find(x => x.id === id);
+    menu.innerHTML = `<button class="filter-menu-row admin-menu-btn" onclick="closeAvatarMenu(); changeAvatar('${id}')">📤 Upload new photo</button>
+      ${mm && mm.avatar ? `<button class="filter-menu-row admin-menu-btn" onclick="closeAvatarMenu(); removeAvatar('${id}')" style="color:#991b1b">🗑️ Remove photo</button>` : ''}`;
+    const btn = event.currentTarget.getBoundingClientRect();
+    menu.style.left = btn.left + 'px';
+    menu.style.top = (btn.bottom + 6) + 'px';
+  }
+  menu.classList.toggle('open', opening);
+}
+function closeAvatarMenu() { document.getElementById('avatar-menu').classList.remove('open'); }
+document.addEventListener('click', e => { if (!e.target.closest('#avatar-menu, .member-avatar-edit')) closeAvatarMenu(); });
 let avatarTargetId = null;
 function changeAvatar(id) {
   if (!(isAdmin || id === myMemberId())) return;
   avatarTargetId = id;
   document.getElementById('avatar-file-input').click();
+}
+function removeAvatar(id) {
+  if (!(isAdmin || id === myMemberId())) return;
+  pushMemberPatch(id, { avatar: null });
+  renderMemberSidebar();
 }
 function handleAvatarFile(event) {
   const file = event.target.files[0];
