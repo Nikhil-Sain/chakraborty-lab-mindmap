@@ -47,11 +47,24 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .member-avatar-edit:hover{background:#6d28d9}
 .member-sidebar-empty{font-size:10.5px;color:#9ca3af;text-align:center;padding:10px 4px}
 .toolbar{display:none;flex-shrink:0;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
-.btn-toolbar{padding:7px 14px;border-radius:8px;border:1.5px dashed #c4b5fd;background:#faf5ff;color:#6d28d9;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
-.btn-toolbar:hover{background:#f2e8fe}
-.btn-toolbar:disabled{opacity:.4;cursor:not-allowed;background:#faf5ff}
+.btn-toolbar{padding:7px 14px;border-radius:8px;border:none;background:#7c3aed;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.btn-toolbar:hover{background:#6d28d9}
+.btn-toolbar:disabled{opacity:.4;cursor:not-allowed;background:#7c3aed}
 .add-project-corner:hover rect{fill:#f2e8fe}
-.btn-toolbar:disabled:hover{background:#faf5ff}
+.btn-toolbar:disabled:hover{background:#7c3aed}
+/* Commit gets its own color instead of the generic toolbar purple — a solid, inviting green
+   while there's something new since the last commit waiting on it, fading to transparent
+   once it's all caught up so it stops competing for attention when there's nothing to do. */
+.btn-commit-needed{background:#22c55e;color:#fff}
+.btn-commit-needed:hover{background:#16a34a}
+.btn-commit-done{background:transparent;color:#16a34a;border:1.5px solid #bbf7d0}
+.btn-commit-done:hover{background:#f0fdf4}
+/* Export/Import get their own colors too, distinct from the generic toolbar purple and
+   from each other, so the two opposite-direction actions read apart at a glance. */
+#btn-export{background:#2563eb}
+#btn-export:hover{background:#1d4ed8}
+#btn-import{background:#0891b2}
+#btn-import:hover{background:#0e7490}
 
 /* ── Add-node shape buttons (one bright, distinctly-shaped control per depth) ── */
 .btn-shape{border:none;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;color:#111;box-shadow:0 2px 6px rgba(0,0,0,.18)}
@@ -80,6 +93,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .thread-color-input::-moz-color-swatch{border:none;border-radius:4px}
 .filter-menu{position:fixed;display:none;flex-direction:column;gap:2px;background:#ffffff;border:1px solid #e0e7ff;padding:8px;border-radius:12px;z-index:150;box-shadow:0 12px 28px rgba(67,56,202,.18);min-width:190px;max-height:320px;overflow-y:auto}
 .filter-menu.open{display:flex}
+.hover-tip{display:none;position:fixed;max-width:260px;background:#1e293b;color:#f1f5f9;font-size:11.5px;line-height:1.5;padding:10px 12px;border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,.28);z-index:300;pointer-events:none}
+.hover-tip.open{display:block}
 .filter-menu-section{font-size:10px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#9ca3af;padding:6px 6px 3px;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .filter-menu-selectall{font-size:10px;font-weight:800;letter-spacing:normal;text-transform:none;color:#7c3aed;background:none;border:none;cursor:pointer;font-family:inherit;padding:0}
 .filter-menu-selectall:hover{text-decoration:underline}
@@ -215,7 +230,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
   <div class="hdr-logo">🔬 Chakraborty Research Lab</div>
   <div class="hdr-spacer"></div>
   <button class="btn-hdr" id="btn-admin-menu" onclick="toggleAdminMenu(event)" style="display:none">⚙ Admin Controls ▾</button>
-  <button class="btn-hdr" id="btn-manage-members" onclick="openMemberManager()" style="display:none">👥 Manage Members</button>
   <button class="btn-hdr admin-badge" id="btn-admin-preview" onclick="toggleAdminPreview()" style="display:none" title="Click to switch between your admin view and seeing/working the board as a regular member would">🔓 Admin</button>
   <button class="btn-hdr" id="btn-sign-out" onclick="handleSignOut()" style="display:none">🚪 Sign Out</button>
 </div>
@@ -233,8 +247,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
     <button class="btn-toolbar" id="btn-commit" onclick="commitBoard()" title="Admin: lock in everything on this board so far — new entries can still be added afterward" style="display:none">✅ Commit</button>
     <button class="btn-toolbar" id="btn-undo" onclick="undo()" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
     <button class="btn-toolbar" id="btn-redo" onclick="redo()" title="Redo (Ctrl+Y)" disabled>↷ Redo</button>
-    <button class="btn-toolbar" id="btn-export" onclick="exportData()" title="Admin only — download everything as a .json backup file" style="display:none">⬇ Export</button>
-    <button class="btn-toolbar" id="btn-import" onclick="triggerImport()" title="Admin only — load a previously exported .json backup into the board you're viewing" style="display:none">⬆ Import</button>
+    <button class="btn-toolbar" id="btn-export" onclick="exportData()" onmouseenter="showHoverTip(event)" onmouseleave="hideHoverTip()" style="display:none">⬇ Export</button>
+    <button class="btn-toolbar" id="btn-import" onclick="triggerImport()" onmouseenter="showHoverTip(event)" onmouseleave="hideHoverTip()" style="display:none">⬆ Import</button>
     <input type="file" id="import-file-input" accept="application/json" style="display:none" onchange="handleImportFile(event)">
     <span class="toolbar-hint" id="toolbar-hint"></span>
     <div class="node-actions" id="node-actions">
@@ -297,6 +311,25 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
   </div>
 </div>
 
+<!-- ── IMPORT CONFIRMATION: re-enter your password before an overwrite ── -->
+<div class="overlay" id="ov-import-confirm">
+  <div class="modal">
+    <h3>🔐 Confirm Import</h3>
+    <div class="login-error show" style="background:#fef3c7;color:#92400e;margin-bottom:14px">
+      ⚠️ This will permanently overwrite everything currently on <strong id="ic-board-name">this board</strong> with the contents of the file you selected. This cannot be undone.
+    </div>
+    <div class="fg">
+      <label>Re-enter your password to confirm</label>
+      <input type="password" id="ic-password" autocomplete="current-password">
+    </div>
+    <div class="login-error" id="ic-error"></div>
+    <div class="modal-footer">
+      <button class="btn btn-dismiss" onclick="closeImportConfirm()">Cancel</button>
+      <button class="btn btn-save" id="ic-confirm-btn" onclick="confirmImportWithPassword()">Overwrite and Import</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── ADMIN: MANAGE MEMBERS ── -->
 <div class="overlay" id="ov-members">
   <div class="modal">
@@ -334,6 +367,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 <!-- ── MAP FILTERS (which projects show, plus room for more filter kinds later) ── -->
 <div id="filter-menu" class="filter-menu"></div>
 
+<!-- ── HOVER EXPLAINER — a small rich tooltip for buttons whose one-line title isn't enough ── -->
+<div id="hover-tip" class="hover-tip"></div>
+
 <!-- ── ADMIN CONTROLS ▾ MENU (header dropdown — currently just data entry controls, room for more later) ── -->
 <div id="admin-menu" class="filter-menu"></div>
 
@@ -344,8 +380,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
     <div class="fg">
       <label>Which dates can they use for new entries?</label>
       <div style="display:flex;flex-direction:column;gap:6px">
-        <button class="ac-mode-btn" data-mode="none" onclick="setDateRestrictionMode('none')">No restriction — any date</button>
         <button class="ac-mode-btn" data-mode="thisAndNextWeek" onclick="setDateRestrictionMode('thisAndNextWeek')">This week and next week</button>
+        <button class="ac-mode-btn" data-mode="none" onclick="setDateRestrictionMode('none')">No restriction — any date</button>
         <button class="ac-mode-btn" data-mode="sinceCommit" onclick="setDateRestrictionMode('sinceCommit')">From their last commit onward</button>
         <button class="ac-mode-btn" data-mode="custom" onclick="setDateRestrictionMode('custom')">Custom range</button>
       </div>
@@ -357,7 +393,11 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
         <input type="date" id="ac-end-date" onchange="updateCustomDateRestriction()" style="flex:1;padding:8px 10px;border:1.5px solid #e5e7eb;border-radius:7px;font-size:13px;font-family:inherit">
       </div>
     </div>
-    <div style="font-size:11px;color:#9ca3af;margin-bottom:14px" id="ac-effective-note"></div>
+    <div style="font-size:11px;color:#9ca3af;margin-bottom:10px" id="ac-effective-note"></div>
+    <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:#374151;margin-bottom:14px;cursor:pointer">
+      <input type="checkbox" id="ac-apply-all">
+      Apply to all members instead of just this one
+    </label>
     <div class="modal-footer">
       <button class="btn btn-save" onclick="closeAdminControls()">Done</button>
     </div>
@@ -379,7 +419,8 @@ window.firebaseReady = new Promise(res => { window.firebaseReadyResolve = res; }
   import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, onSnapshot }
     from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
-            createUserWithEmailAndPassword, sendPasswordResetEmail, deleteUser }
+            createUserWithEmailAndPassword, sendPasswordResetEmail, deleteUser,
+            EmailAuthProvider, reauthenticateWithCredential }
     from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
 
   const firebaseConfig = {
@@ -402,6 +443,11 @@ window.firebaseReady = new Promise(res => { window.firebaseReadyResolve = res; }
   window.fbSignIn = (email, pw) => signInWithEmailAndPassword(auth, email, pw);
   window.fbSignOut = () => signOut(auth);
   window.fbSendPasswordReset = (email) => sendPasswordResetEmail(auth, email);
+  // Re-proves the currently signed-in admin's own password before a destructive action
+  // (importing over existing data) — throws if the password is wrong, same as a failed
+  // sign-in would, so the caller can just catch it and show an error.
+  window.fbReauthenticate = (email, password) =>
+    reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(email, password));
   window.fbDoc = (...path) => doc(db, ...path);
   window.fbSetDoc = (ref, data) => setDoc(ref, data);
   window.fbGetDoc = (ref) => getDoc(ref);
@@ -498,8 +544,10 @@ function canEditNode(node) { return canEditBoard() && !isNodeLocked(node); }
 // "since last commit" only means anything relative to THAT member's own commit history
 // anyway — admin sets it per board, same place they already review and commit from.
 function dateRestrictionBounds(m) {
-  const dr = m && m.dateRestriction;
-  if (!dr || dr.mode === 'none') return { min: null, max: null };
+  // Unset (never touched by admin) defaults to "this week and next" rather than wide open —
+  // "no restriction" is still available, but has to be chosen on purpose.
+  const dr = (m && m.dateRestriction) || { mode: 'thisAndNextWeek' };
+  if (dr.mode === 'none') return { min: null, max: null };
   if (dr.mode === 'thisAndNextWeek') {
     const now = weekOfYear(todayStr());
     const nextWeekEnd = new Date(now.weekEnd);
@@ -600,12 +648,17 @@ function updateUndoButtons() {
 }
 // ── BACKUP / RESTORE — a manual safety net independent of the live database.
 function exportData() {
-  if (!isAdmin) return;
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  if (!canEditBoard()) return;
+  const m = activeMember(); if (!m) return;
+  // Admin gets the whole lab (every member) — a member gets only their own board, never
+  // anyone else's, even though they're both hitting the same button.
+  const payload = isAdmin ? data : { members: [m] };
+  const suffix = isAdmin ? '' : `-${m.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `chakraborty-lab-backup-${todayStr()}.json`;
+  a.download = `chakraborty-lab-backup${suffix}-${todayStr()}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -613,8 +666,10 @@ function exportData() {
 }
 function triggerImport() { if (!isAdmin) return; document.getElementById('import-file-input').click(); }
 // Admin-only — restricted to reduce the risk of someone accidentally overwriting live data
-// with a stale backup. Still only ever imports into your OWN board — a shared backup can't
-// blindly overwrite everyone at once from the browser (security rules wouldn't allow it).
+// with a stale backup. Always overwrites whichever board is currently being viewed (a shared
+// backup can't blindly overwrite every member at once from the browser — security rules
+// wouldn't allow it, and this only ever writes the one board on screen).
+let pendingImportRest = null;
 function handleImportFile(event) {
   const file = event.target.files[0];
   event.target.value = '';
@@ -628,13 +683,48 @@ function handleImportFile(event) {
     catch (e) { alert('That file is not valid JSON.'); return; }
     const incoming = Array.isArray(parsed.members) ? parsed.members[0] : parsed;
     if (!incoming || !Array.isArray(incoming.topics)) { alert("That file doesn't look like a Chakraborty Lab backup."); return; }
-    if (!confirm('Import this backup into your own board? It will replace everything you currently have.')) return;
-    const m = activeMember();
     const { id, ...rest } = incoming; // keep the real doc id (your UID), take everything else
-    Object.assign(m, rest);
-    save(); renderAll();
+    openImportConfirm(rest);
   };
   reader.readAsText(file);
+}
+// Importing overwrites a whole board permanently, so it needs more than a plain confirm() —
+// re-proving the admin's own password is a real speed bump against a stray click doing
+// something this destructive.
+function openImportConfirm(rest) {
+  pendingImportRest = rest;
+  const m = activeMember();
+  document.getElementById('ic-board-name').textContent = m ? `"${m.name}"'s board` : 'this board';
+  document.getElementById('ic-password').value = '';
+  document.getElementById('ic-error').classList.remove('show');
+  document.getElementById('ov-import-confirm').classList.add('open');
+  setTimeout(() => document.getElementById('ic-password').focus(), 50);
+}
+function closeImportConfirm() {
+  pendingImportRest = null;
+  document.getElementById('ov-import-confirm').classList.remove('open');
+}
+async function confirmImportWithPassword() {
+  const errEl = document.getElementById('ic-error');
+  errEl.classList.remove('show');
+  if (!pendingImportRest || !isAdmin) { closeImportConfirm(); return; }
+  const password = document.getElementById('ic-password').value;
+  if (!password) { errEl.textContent = 'Enter your password to confirm.'; errEl.classList.add('show'); return; }
+  const btn = document.getElementById('ic-confirm-btn');
+  btn.disabled = true;
+  try {
+    await window.fbReauthenticate(firebaseUser.email, password);
+  } catch (e) {
+    btn.disabled = false;
+    errEl.textContent = 'Incorrect password — nothing was imported.';
+    errEl.classList.add('show');
+    return;
+  }
+  const m = activeMember();
+  if (m) { Object.assign(m, pendingImportRest); save(); }
+  btn.disabled = false;
+  closeImportConfirm();
+  renderAll();
 }
 function undo() {
   const m = activeMember(); if (!m) return;
@@ -929,6 +1019,7 @@ function commitBoard() {
 }
 // ── ADMIN: MANAGE MEMBERS ───────────────────────────────────────────────
 function openMemberManager() {
+  document.getElementById('admin-menu').classList.remove('open');
   renderMembersList();
   document.getElementById('ov-members').classList.add('open');
 }
@@ -1106,13 +1197,31 @@ function toggleAdminMenu(event) {
   const menu = document.getElementById('admin-menu');
   const opening = !menu.classList.contains('open');
   if (opening) {
-    menu.innerHTML = `<button class="filter-menu-row admin-menu-btn" onclick="openAdminControls()">📅 Data entry controls</button>`;
+    menu.innerHTML = `<button class="filter-menu-row admin-menu-btn" onclick="openAdminControls()">📅 Data entry controls</button>
+      <button class="filter-menu-row admin-menu-btn" onclick="openMemberManager()">👥 Manage Members</button>`;
     const btn = event.currentTarget.getBoundingClientRect();
     menu.style.left = btn.left + 'px';
     menu.style.top = (btn.bottom + 6) + 'px';
   }
   menu.classList.toggle('open', opening);
 }
+
+// ── HOVER EXPLAINERS — richer than a plain title="" tooltip, for buttons whose behavior
+// (especially "this replaces everything," for Import) isn't obvious from a one-line label. ──
+const HOVER_TIPS = {
+  'btn-export': 'Downloads a JSON backup file. Admins get the whole lab — every member, project, and topic. Members get just their own board.',
+  'btn-import': "Restores a backup file into your OWN currently-viewed board. This completely replaces everything already there — it's not a merge."
+};
+function showHoverTip(event) {
+  const text = HOVER_TIPS[event.currentTarget.id]; if (!text) return;
+  const tip = document.getElementById('hover-tip');
+  tip.textContent = text;
+  const r = event.currentTarget.getBoundingClientRect();
+  tip.style.left = r.left + 'px';
+  tip.style.top = (r.bottom + 8) + 'px';
+  tip.classList.add('open');
+}
+function hideHoverTip() { document.getElementById('hover-tip').classList.remove('open'); }
 document.addEventListener('click', e => { if (!e.target.closest('#admin-menu, #btn-admin-menu')) document.getElementById('admin-menu').classList.remove('open'); });
 
 // ── ADMIN CONTROLS — which dates the currently-viewed member can use for new entries.
@@ -1122,13 +1231,14 @@ function openAdminControls() {
   const m = activeMember(); if (!m || !isAdmin) return;
   document.getElementById('admin-menu').classList.remove('open');
   document.getElementById('ac-title').textContent = `📅 Data entry controls — ${m.name}`;
+  document.getElementById('ac-apply-all').checked = false; // never carry this over between openings
   renderAdminControls();
   document.getElementById('ov-admin-controls').classList.add('open');
 }
 function closeAdminControls() { document.getElementById('ov-admin-controls').classList.remove('open'); }
 function renderAdminControls() {
   const m = activeMember(); if (!m) return;
-  const dr = m.dateRestriction || { mode: 'none' };
+  const dr = m.dateRestriction || { mode: 'thisAndNextWeek' };
   document.querySelectorAll('.ac-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === dr.mode));
   document.getElementById('ac-custom-range').style.display = dr.mode === 'custom' ? 'block' : 'none';
   document.getElementById('ac-start-date').value = dr.start || '';
@@ -1150,16 +1260,26 @@ function renderAdminControls() {
 function setDateRestrictionMode(mode) {
   const m = activeMember(); if (!m || !isAdmin) return;
   const prev = m.dateRestriction || {};
-  m.dateRestriction = { mode, start: prev.start || null, end: prev.end || null };
-  save();
-  renderAdminControls();
+  applyDateRestrictionPatch({ mode, start: prev.start || null, end: prev.end || null });
 }
 function updateCustomDateRestriction() {
-  const m = activeMember(); if (!m || !isAdmin) return;
+  if (!isAdmin) return;
   const start = document.getElementById('ac-start-date').value || null;
   const end = document.getElementById('ac-end-date').value || null;
-  m.dateRestriction = { mode: 'custom', start, end };
-  save();
+  applyDateRestrictionPatch({ mode: 'custom', start, end });
+}
+// "Apply to all" bulk-writes every member's own doc directly (like pushMemberPatch) rather
+// than going through save() — it's a one-shot admin policy push across boards that aren't
+// even the one on screen, not an edit that belongs in this board's own undo history.
+function applyDateRestrictionPatch(patch) {
+  const m = activeMember(); if (!m || !isAdmin) return;
+  const applyAll = document.getElementById('ac-apply-all').checked;
+  if (applyAll) {
+    data.members.forEach(mem => { mem.dateRestriction = { ...patch }; pushMemberToFirestore(mem); });
+  } else {
+    m.dateRestriction = patch;
+    save();
+  }
   renderAdminControls();
 }
 
@@ -1252,7 +1372,9 @@ function saveNodeModal() {
 }
 document.getElementById('ov-node').addEventListener('click', e => { if (e.target.id === 'ov-node') closeNodeModal(); });
 document.getElementById('ov-connect').addEventListener('click', e => { if (e.target.id === 'ov-connect') closeConnectModal(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeNodeModal(); closeConnectModal(); } });
+document.getElementById('ov-import-confirm').addEventListener('click', e => { if (e.target.id === 'ov-import-confirm') closeImportConfirm(); });
+document.getElementById('ic-password').addEventListener('keydown', e => { if (e.key === 'Enter') confirmImportWithPassword(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeNodeModal(); closeConnectModal(); closeImportConfirm(); } });
 
 const KIND_LABEL = { node: 'Node', sub: 'Sub Node', subsub: 'Micro Node' };
 // All three buttons attach the new entry to whatever is currently selected (the anchor) —
@@ -1527,7 +1649,6 @@ function buildTree(m) {
 // so they stay reachable even before any member exists — this must not depend on activeMember().
 function updateHeaderControls() {
   document.getElementById('btn-admin-menu').style.display = isAdmin ? '' : 'none';
-  document.getElementById('btn-manage-members').style.display = isAdmin ? '' : 'none';
   document.getElementById('btn-sign-out').style.display = firebaseUser ? '' : 'none';
   // One button doing double duty as both the status badge and the toggle — stays visible
   // (and clickable) to a real admin no matter which side they're currently on, since it's
@@ -1607,8 +1728,15 @@ function updateToolbarHint() {
   ['btn-add-node', 'btn-add-sub', 'btn-add-subsub'].forEach(id => {
     document.getElementById(id).disabled = !editable;
   });
-  document.getElementById('btn-commit').style.display = isAdmin ? '' : 'none';
-  document.getElementById('btn-export').style.display = isAdmin ? '' : 'none';
+  const commitBtn = document.getElementById('btn-commit');
+  commitBtn.style.display = isAdmin ? '' : 'none';
+  const needsCommit = memberNeedsReview(m);
+  commitBtn.classList.toggle('btn-commit-needed', needsCommit);
+  commitBtn.classList.toggle('btn-commit-done', !needsCommit);
+  // Export is available to a member on their own board too (just their own data, not
+  // everyone's — see exportData()) — Import stays admin-only, since it overwrites whatever
+  // board is on screen and shouldn't be something a member can trigger even on themselves.
+  document.getElementById('btn-export').style.display = editable ? '' : 'none';
   document.getElementById('btn-import').style.display = isAdmin ? '' : 'none';
 
   const el = document.getElementById('toolbar-hint');
