@@ -1089,7 +1089,13 @@ async function handleAuthChange(user) {
     // open panel and focused field aren't disturbed). Running the full render here too would
     // undo that and blow away whatever's mid-edit. Only a genuine change from elsewhere
     // (another tab, another member, the server ack) needs the full re-render.
-    if (!snapshot.metadata.hasPendingWrites) renderAll();
+    // Additionally, only re-render when the VIEWED member's document actually changed —
+    // if another lab member saves data, their doc changes but the current view is unaffected,
+    // so we skip the costly SVG teardown/rebuild entirely.
+    if (!snapshot.metadata.hasPendingWrites) {
+      const changedIds = new Set(snapshot.docChanges().map(c => c.doc.id));
+      if (!viewMemberId || changedIds.has(viewMemberId)) renderAll();
+    }
   }, err => console.error('members listener error', err));
 }
 window.addEventListener('auth-changed', e => handleAuthChange(e.detail));
