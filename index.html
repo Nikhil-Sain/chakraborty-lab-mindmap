@@ -1392,25 +1392,27 @@ function saveProjectModal() {
 function deleteProject(id) {
   const m = activeMember(); if (!m || !isAdmin) return;
   const p = m.projects.find(x => x.id === id); if (!p) return;
+  const memberId = m.id;
   openDeleteConfirm(`Delete project "${p.name}" and all its topics? This cannot be undone.`, () => {
+    const curM = activeMember(); if (!curM || curM.id !== memberId) return;
     let removedIds = [];
-    m.topics.filter(t => t.projectId === id).forEach(t => { removedIds = removedIds.concat(collectIds(t)); });
-    pruneConnections(m, removedIds);
-    m.topics = m.topics.filter(t => t.projectId !== id);
-    m.projects = m.projects.filter(x => x.id !== id);
-    if (!m.projects.length) {
+    curM.topics.filter(t => t.projectId === id).forEach(t => { removedIds = removedIds.concat(collectIds(t)); });
+    pruneConnections(curM, removedIds);
+    curM.topics = curM.topics.filter(t => t.projectId !== id);
+    curM.projects = curM.projects.filter(x => x.id !== id);
+    if (!curM.projects.length) {
       // Admin can delete a member's only remaining project — but leaving them with zero
       // projects would break anything that assumes at least one exists (adding a node, the
       // Filters panel, ...), so a fresh blank one takes its place instead of the board just
       // ending up in a broken state.
       const freshId = genId();
-      m.projects.push({ id: freshId, name: 'New Project' });
-      m.lastProjectId = freshId;
-    } else if (m.lastProjectId === id) {
-      m.lastProjectId = m.projects[0].id;
+      curM.projects.push({ id: freshId, name: 'New Project' });
+      curM.lastProjectId = freshId;
+    } else if (curM.lastProjectId === id) {
+      curM.lastProjectId = curM.projects[0].id;
     }
-    if (removedIds.includes(m.lastTopicId)) m.lastTopicId = null;
-    delete hiddenProjectIds[m.id]; // stale ids in a Set are harmless, but no reason to keep them
+    if (removedIds.includes(curM.lastTopicId)) curM.lastTopicId = null;
+    delete hiddenProjectIds[curM.id]; // stale ids in a Set are harmless, but no reason to keep them
     save(); closeDetail(); buildD3Map();
     renderFilterMenu();
   });
@@ -1740,13 +1742,18 @@ function deleteNode(id) {
     ? `Delete "${node.text}"? Its ${kids.length} sub-node${kids.length !== 1 ? 's' : ''} will move up in its place.`
     : `Delete "${node.text}"?`;
   const doDelete = () => {
-    pruneConnections(m, [id]);
-    // A top-level topic carries its project on itself (its parent array is m.topics, not
+    const curM = activeMember(); if (!curM) return;
+    const curArr = findParentArray(curM, id); if (!curArr) return;
+    const curIdx = curArr.findIndex(n => n.id === id); if (curIdx === -1) return;
+    const curNode = curArr[curIdx];
+    const curKids = curNode.children || [];
+    pruneConnections(curM, [id]);
+    // A top-level topic carries its project on itself (its parent array is curM.topics, not
     // another node's children) — promoted children need that same projectId, or they'd be
     // silently filtered out of every project (i.e. vanish from the map) once spliced in.
-    if (node.projectId) kids.forEach(k => { k.projectId = node.projectId; });
-    arr.splice(idx, 1, ...kids);
-    if (m.lastTopicId === id) m.lastTopicId = null;
+    if (curNode.projectId) curKids.forEach(k => { k.projectId = curNode.projectId; });
+    curArr.splice(curIdx, 1, ...curKids);
+    if (curM.lastTopicId === id) curM.lastTopicId = null;
     save(); closeDetail(); buildD3Map();
   };
   if (isAdmin) { openDeleteConfirm(msg, doDelete); return; }
@@ -1878,7 +1885,11 @@ function removeProjectPoint(id, idx) {
   const m = activeMember(); if (!m || !canEditBoard()) return;
   const p = m.projects.find(x => x.id === id); if (!p || !p.points) return;
   if (isPointLocked(p.points[idx])) return;
-  const doRemove = () => { p.points.splice(idx, 1); save(); showRootDetail(m, id); };
+  const doRemove = () => {
+    const curM = activeMember(); if (!curM || !canEditBoard()) return;
+    const curP = curM.projects.find(x => x.id === id); if (!curP || !curP.points) return;
+    curP.points.splice(idx, 1); save(); showRootDetail(curM, id);
+  };
   if (isAdmin) { openDeleteConfirm('Delete this description point? This cannot be undone.', doRemove); return; }
   doRemove();
 }
@@ -1962,7 +1973,11 @@ function removeTopicBullet(nodeId, idx) {
   const m = activeMember(); if (!m || !canEditBoard()) return;
   const n = findNode(m, nodeId); if (!n || !canEditNode(n)) return;
   if (!n.bullets) return;
-  const doRemove = () => { n.bullets.splice(idx, 1); save(); showTopicDetail(findNode(activeMember(), nodeId)); };
+  const doRemove = () => {
+    const curM = activeMember(); if (!curM || !canEditBoard()) return;
+    const curN = findNode(curM, nodeId); if (!curN || !curN.bullets) return;
+    curN.bullets.splice(idx, 1); save(); showTopicDetail(findNode(activeMember(), nodeId));
+  };
   if (isAdmin) { openDeleteConfirm('Delete this description point? This cannot be undone.', doRemove); return; }
   doRemove();
 }
@@ -2980,8 +2995,11 @@ function topicDragBehavior() {
     })
     .on('end', function (event, d) {
       if (!dragAllowed) return;
-      d.data.nodeRef.manualY = curX;
-      d.data.nodeRef.manualX = curY;
+      const dragNodeId = d.data.nodeRef.id;
+      const curM = activeMember(); if (!curM) return;
+      const curNode = findNode(curM, dragNodeId); if (!curNode) return;
+      curNode.manualY = curX;
+      curNode.manualX = curY;
       save();
       buildD3Map();
     });
@@ -3238,8 +3256,9 @@ function editNodeName(event, d, gSel) {
     setValue = v => { const p = proj(); if (p) p.name = v; };
     fo = gSel.append('foreignObject').attr('class', 'inline-edit-fo').attr('x', -140).attr('y', -14).attr('width', 120).attr('height', 28);
   } else if (d.data.type === 'topic') {
-    getValue = () => d.data.nodeRef.text;
-    setValue = v => { d.data.nodeRef.text = v; };
+    const editNodeId = d.data.nodeRef.id;
+    getValue = () => { const cur = findNode(activeMember(), editNodeId); return (cur && cur.text) || ''; };
+    setValue = v => { const cur = findNode(activeMember(), editNodeId); if (cur) cur.text = v; };
     fo = gSel.append('foreignObject').attr('class', 'inline-edit-fo').attr('x', 11).attr('y', -10).attr('width', 180).attr('height', 20);
   } else return;
 
