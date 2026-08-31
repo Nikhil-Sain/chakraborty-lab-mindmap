@@ -2228,6 +2228,13 @@ function buildD3Map() {
   const W = wrap.clientWidth - panelW, H = wrap.clientHeight;
 
   const svg = d3.select('#map-svg').attr('width', W).attr('height', H);
+
+  // Capture the current pan/zoom BEFORE wiping the SVG — the __zoom property lives on the
+  // DOM node and survives selectAll('*').remove(), but we read it now to be safe.
+  let savedTransform = null;
+  try { savedTransform = d3.zoomTransform(svg.node()); } catch (e) { /* no prior zoom */ }
+  const isFirstBuild = !savedTransform || (savedTransform.k === 1 && savedTransform.x === 0 && savedTransform.y === 0);
+
   svg.selectAll('*').remove();
 
   mapZoom = d3.zoom().scaleExtent([0.25, 2.4]).on('zoom', e => mapInner.attr('transform', e.transform));
@@ -2243,7 +2250,13 @@ function buildD3Map() {
   mapRoot = d3.hierarchy(treeData, d => d.children);
   mapRoot.x0 = 40; mapRoot.y0 = 0;
   mapUpdate(mapRoot);
-  setTimeout(resetMapView, 60);
+  if (isFirstBuild) {
+    // First load — fly to the default home view
+    setTimeout(resetMapView, 60);
+  } else {
+    // Firestore re-render — restore the user's pan/zoom silently, no snap or jump
+    svg.call(mapZoom.transform, savedTransform);
+  }
 }
 
 function mapUpdate(source) {
