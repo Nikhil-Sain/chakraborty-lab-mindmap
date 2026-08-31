@@ -1983,7 +1983,22 @@ function removeTopicBullet(nodeId, idx) {
 }
 
 function renderAll() {
-  if (!document.getElementById('detail-panel').contains(document.activeElement)) closeDetail();
+  const active = document.activeElement;
+  const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
+  if (isTyping) {
+    // User is actively typing — defer the full rebuild until they leave the field.
+    // Attach only one deferred listener per element to avoid stacking on rapid Firestore fires.
+    if (!active._renderPending) {
+      active._renderPending = true;
+      active.addEventListener('blur', function resume() {
+        active._renderPending = false;
+        active.removeEventListener('blur', resume);
+        renderAll();
+      });
+    }
+    return;
+  }
+  if (!document.getElementById('detail-panel').contains(active)) closeDetail();
   buildD3Map();
 }
 
