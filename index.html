@@ -1079,6 +1079,10 @@ async function handleAuthChange(user) {
     realIsAdmin = !!(me && me.isAdmin);
     applyAdminPreview();
     reconcileViewAfterDataChange();
+    // Always refresh the member sidebar — it must reflect the full member list even when
+    // a different member (not the one being viewed) saves data or a new member is added.
+    // This is cheap (pure DOM, no D3 rebuild) so it's safe to call on every snapshot.
+    renderMemberSidebar();
     // Lazy init only — never overwrites an in-progress baseline. Covers the very first
     // snapshot after signing in, when switchViewMember() was never called for this board.
     const cur = activeMember();
