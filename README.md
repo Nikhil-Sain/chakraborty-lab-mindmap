@@ -39,7 +39,7 @@ Three shapes are available from the toolbar, each a different "depth":
 |---|---|---|
 | ● **Node** | ribbon/banner, full column width | top-level milestones |
 | ■ **Sub Node** | squared octagon, ⅓ column width | smaller items under a Node |
-| ◆ **Sub Sub Node** | parallelogram, full column width | detail under a Sub Node |
+| ◆ **Micro Node** | parallelogram, full column width | detail under a Sub Node |
 
 **Where a new entry attaches** depends on what's currently selected:
 
@@ -61,7 +61,7 @@ decides which week column it lands in.
   it, then use the **✎ Edit**, 🔗 **Connect**, or ✕ **Delete** buttons that
   appear in the toolbar (top right).
   - Inside **Edit**, a row of small shape buttons lets you switch the node
-    between Node / Sub Node / Sub Sub Node without moving it in the tree.
+    between Node / Sub Node / Micro Node without moving it in the tree.
 - **Deleting** a node keeps its own sub-nodes — they just move up to take its
   place, reconnecting to whatever came before it. Nothing "downstream" is
   lost.
