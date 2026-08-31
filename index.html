@@ -536,7 +536,7 @@ window.firebaseReady = new Promise(res => { window.firebaseReadyResolve = res; }
   // writes the profile doc, then either finishes (send the reset email) or aborts (delete the
   // just-created account) depending on whether that write actually succeeded.
   window.fbCreateMemberAccount = async (email) => {
-    const throwawayPw = crypto.randomUUID();
+    const throwawayPw = 'Tmp1!' + crypto.randomUUID(); // prefix satisfies uppercase/digit/symbol policies
     const cred = await createUserWithEmailAndPassword(secondaryAuth, email, throwawayPw);
     return cred.user; // still signed in on the secondary instance at this point
   };
