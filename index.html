@@ -2343,9 +2343,9 @@ function mapUpdate(source) {
         colY[col] = Math.max(colY[col], ref.manualY + cellHeight / 2 + rowGap);
         return;
       }
-      const parent = d.parent;
-      const preferredTop = (parent && parent.data.type === 'topic') ? (parent.x - cellHeight / 2) : colY[col];
-      const top = Math.max(colY[col], preferredTop);
+      // Always stack below the current column bottom — new nodes go at the end of
+      // whatever is already in this column, not aligned with their parent's top edge.
+      const top = colY[col];
       d.y = colX[col] + colInset;
       d.x = top + cellHeight / 2;
       colY[col] = Math.max(colY[col], top + cellHeight + rowGap);
@@ -2364,9 +2364,8 @@ function mapUpdate(source) {
     if (ref && ref.manualY != null) {
       top = ref.manualY - cellHeight / 2;
     } else {
-      const parent = d.parent;
-      const preferredTop = (parent && parent.data.type === 'topic') ? (parent.x - cellHeight / 2) : colY[col];
-      top = Math.max(colY[col], preferredTop);
+      // Always stack below the current column bottom.
+      top = colY[col];
     }
     d.x = top + cellHeight / 2;
     d.cellWidth = fullWidth;
