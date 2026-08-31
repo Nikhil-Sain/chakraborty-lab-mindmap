@@ -3152,6 +3152,10 @@ function wireDescCard(fo, n, d, g) {
   inner.on('click', e => e.stopPropagation());
   fo.selectAll('.bullet-textarea').each(function () { autoGrowTextarea(this); });
   if (!editable) return;
+  // Capture the node ID only — the object reference `n` becomes stale after
+  // renderAll() replaces data.members with fresh Firestore data. Re-fetching by id
+  // inside each handler guarantees we always write to the live object.
+  const nodeId = n.id;
   fo.selectAll('.bullet-textarea')
     .on('input', function () {
       applyWordCap(this, BULLET_MAX_WORDS);
@@ -3159,22 +3163,26 @@ function wireDescCard(fo, n, d, g) {
     })
     .on('blur', function () {
       const idx = +this.getAttribute('data-idx');
-      n.bullets[idx] = limitWords(this.value.trim(), BULLET_MAX_WORDS);
+      const cur = findNode(activeMember(), nodeId); if (!cur) return;
+      cur.bullets = cur.bullets || [];
+      cur.bullets[idx] = limitWords(this.value.trim(), BULLET_MAX_WORDS);
       save(); refreshHasContentDot(d, g);
     });
   fo.selectAll('.bullet-remove').on('click', function () {
     const idx = +this.getAttribute('data-idx');
-    n.bullets.splice(idx, 1);
-    save(); wireDescCard(fo, n, d, g); refreshHasContentDot(d, g);
-    if (detailTopicId === n.id) showTopicDetail(n);
+    const cur = findNode(activeMember(), nodeId); if (!cur) return;
+    cur.bullets.splice(idx, 1);
+    save(); wireDescCard(fo, cur, d, g); refreshHasContentDot(d, g);
+    if (detailTopicId === nodeId) showTopicDetail(cur);
   });
   fo.select('.bullet-add').on('click', function () {
-    n.bullets = n.bullets || [];
-    n.bullets.push('');
-    save(); wireDescCard(fo, n, d, g);
+    const cur = findNode(activeMember(), nodeId); if (!cur) return;
+    cur.bullets = cur.bullets || [];
+    cur.bullets.push('');
+    save(); wireDescCard(fo, cur, d, g);
     const areas = fo.selectAll('.bullet-textarea').nodes();
     if (areas.length) areas[areas.length - 1].focus();
-    if (detailTopicId === n.id) showTopicDetail(n);
+    if (detailTopicId === nodeId) showTopicDetail(cur);
   });
 }
 function refreshHasContentDot(d, g) {
