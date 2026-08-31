@@ -1,140 +1,196 @@
 # Chakraborty Research Lab — Mind Map Guide
 
-A shared lab notebook, live for everyone in the lab. Sign in with your account
-and your entries sync instantly to every other computer — no drive to map, no
-manual sync step.
+A shared, live lab notebook. Sign in with your account and your entries sync
+instantly to every other computer in the lab — no drive to map, no manual
+sync step.
+
+---
 
 ## 1. Signing in
 
-Open the site's URL and sign in with the email and password your admin set up
-for you. Don't have a login? Ask your admin — new logins are created for you,
-not self-registered.
+Open the site URL and enter the email and password your admin set up for you.
+Accounts are not self-registered — ask your admin to create one.
 
-The very first time you sign in, you'll be asked what name should show for
-you in the lab map — that's the only setup step.
+- **Forgot password?** Click the link below Sign In and a reset email will be sent.
+- **First sign-in:** you'll be asked for the display name that will appear on your
+  member tab.
+
+---
 
 ## 2. The layout
 
-- The map is organized into **week columns**, each covering one real
-  calendar week (Sunday–Saturday). A node's position always follows its date.
-- Your **project** is marked by a big 🙂 emoji on the left, with the project
-  name in bold beside it and how many topics it holds underneath.
-- Every entry (node) sits in the week column that matches its date, and
-  connects back to whatever it was added under with a curved line.
-- The **left sidebar** lists every lab member as a tab, with their photo (or
-  initials). Click a tab to view that person's board.
+| Area | What it is |
+|---|---|
+| **Left sidebar** | Member tabs — one per lab member, showing their photo or initials. Click any tab to view that person's board. Toggle between **Current** and **Past** members at the top. |
+| **Week columns** | The main canvas, split into calendar weeks (Sunday–Saturday). Every entry lands in the column that matches its date. |
+| **Toolbar** | Runs across the top of the canvas — add nodes, filter, commit, undo/redo, export/import. |
+| **Detail panel** | Slides in from the right when you click a node — shows its date, week, creation time, and connections. |
+| **Header** | Lab name, Sign Out button, and (for admins) Admin Controls and Admin/Member view toggle. |
 
-## 3. Whose board you're looking at
+---
 
-- **Your own board** — fully editable.
-- **Someone else's board** — read-only. You can look, but every edit control
-  is disabled.
-- **Admins** can edit anyone's board, including committed/locked entries.
+## 3. Adding entries
 
-## 4. Adding entries
+Three node shapes are available from the toolbar, each a different depth:
 
-Three shapes are available from the toolbar, each a different "depth":
+| Button | Shape | Color | Use for |
+|---|---|---|---|
+| ● **Node** | Ribbon / banner | Green | Top-level milestones and major topics |
+| ■ **Sub Node** | Octagon | Blue | Smaller items under a Node |
+| ◆ **Micro Node** | Parallelogram | Orange | Fine-grained details under a Sub Node |
 
-| Button | Shape | Use for |
-|---|---|---|
-| ● **Node** | ribbon/banner, full column width | top-level milestones |
-| ■ **Sub Node** | squared octagon, ⅓ column width | smaller items under a Node |
-| ◆ **Micro Node** | parallelogram, full column width | detail under a Sub Node |
+**Attaching a new entry:**
 
-**Where a new entry attaches** depends on what's currently selected:
+1. Click an existing node or your project's 🙂 icon to select it (a gold ring appears).
+2. Click the shape button — a popup asks for the entry's **text (max 5 words)** and **date**.
+3. The new entry appears in the week column matching its date, connected to its parent.
 
-- Click any node on the map first (it gets a gold ring around it) — the next
-  thing you add becomes its child.
-- Click the project's 🙂 emoji to attach fresh top-level entries to the
-  project directly.
-- The toolbar hint text (next to Undo/Redo) always tells you what you're
-  "continuing from."
+The toolbar hint (beside Undo/Redo) always shows what your next entry will attach to.
 
-A popup asks for the entry's **text (max 5 words)** and **date** — the date
-decides which week column it lands in.
+---
+
+## 4. Projects
+
+Each member can run multiple independent projects on their board, each with its
+own 🙂 root marker.
+
+- **+ Add Project** opens a modal where you set the project name and an optional
+  opening description.
+- Project descriptions are editable bullet-point lists — hover the project's root
+  circle to see and edit them.
+- Click a project's 🙂 or name to open its detail panel, where you can add
+  description points, add the first node, or delete the project (admin password
+  required).
+
+---
 
 ## 5. Editing
 
-- **Rename:** click directly on a node's text on the map, type, and press
-  Enter (or click away) to save. Esc cancels.
-- **Full edit / change type / delete / connect:** click a node once to select
-  it, then use the **✎ Edit**, 🔗 **Connect**, or ✕ **Delete** buttons that
-  appear in the toolbar (top right).
-  - Inside **Edit**, a row of small shape buttons lets you switch the node
-    between Node / Sub Node / Micro Node without moving it in the tree.
-- **Deleting** a node keeps its own sub-nodes — they just move up to take its
-  place, reconnecting to whatever came before it. Nothing "downstream" is
-  lost.
+| Action | How |
+|---|---|
+| **Rename inline** | Click a node's text directly on the map, type, then press Enter or click away. Esc cancels. |
+| **Full edit** | Click the node once to select it, then click **✎ Edit** in the toolbar. Edit the text, date, or switch the node type (Node / Sub Node / Micro Node) using the small shape buttons inside the modal. |
+| **Delete** | Select the node, click **✕ Delete**. Child nodes move up and reconnect to the deleted node's parent — nothing downstream is lost. Admins must re-enter their password to confirm. |
 
-## 6. Adding descriptions
+---
 
-Hover any node to reveal a popup with 🙂-marked points. Type in a box, click
-**+ Add 🙂** for another, or ✕ to remove one — each point is capped at 20
-words. Click a node (rather than hover) to see the same points numbered in
-the right-hand detail panel, along with its date, week, creation time, and
-what it's connected to.
+## 6. Connecting nodes
 
-## 7. Repositioning
+Select a node, then click **🔗 Connect** in the toolbar. Search for any other
+topic on the board and select it — a dashed cross-topic line links the two,
+independent of the tree structure.
 
-Each node has a small 🙂 grip (with ▲/▼ arrows) on its left edge — drag it
-up or down to nudge the node within its own week column. Double-click the
-grip to snap it back to automatic placement. This still works even after
-your entries are committed — only the content itself locks, not its position.
+Click any line on the map (tree or cross-connection) to open the **line editor**:
+- Switch between **Solid** and **Dotted** styles
+- Pick a color from the palette or enter a custom hex
+- **✕ Remove connection** deletes a cross-connection
 
-## 8. Connecting nodes across the map
+---
 
-Select a node, click 🔗 **Connect**, and search for another topic to link to
-it (a dashed cross-topic line, independent of the tree structure). Click any
-line on the map — tree or cross-connection — to change its color/style or
-(for cross-connections) remove it.
+## 7. Filters
 
-## 9. Projects
+Click **🔍 Filters** in the toolbar to show or hide specific projects on the map.
+Useful when a board has many projects and you want to focus on one.
 
-**+ Add Project** starts a second independent trail with its own 🙂 marker.
-Click a project's 🙂/name and use the panel's **+ Add Node** / **✕ Delete
-Project** actions.
+---
 
-## 10. Committing your work
+## 8. Whose board you're on
 
-Click **✅ Commit** to lock in everything you've entered so far — it becomes
-read-only (marked with a 🔒 badge), protecting it from later accidental
-edits. You can still add brand-new entries afterward; they stay editable
-until your next commit. An admin can unlock a commit for you if you need to
-go back and fix something.
+- **Your own board** — fully editable.
+- **Someone else's board** — read-only. Edit controls are disabled.
+- **Admins** — can edit anyone's board, including committed/locked entries.
 
-## 11. Profile pictures
+---
 
-Click the small 📷 button on your own tab in the sidebar to set a profile
-picture. Admins can set anyone's.
+## 9. Committing your work
 
-## 12. Undo / Redo
+Click **✅ Commit** (visible to admins only) to lock all current entries on a
+board. Locked entries show a 🔒 badge and cannot be edited. New entries added
+after a commit remain editable until the next commit.
 
-Every change is tracked — use the toolbar buttons or `Ctrl+Z` / `Ctrl+Y`
-(`Ctrl+Shift+Z` also works for redo). Undo is per-member, tied to whichever
-board you were just editing.
+An admin can unlock a commit via **Manage Members → Unlock**.
+
+---
+
+## 10. Undo / Redo
+
+Every change is tracked. Use **↶ Undo** / **↷ Redo** in the toolbar, or
+`Ctrl+Z` / `Ctrl+Y` (also `Ctrl+Shift+Z`). Undo history is per-member.
+
+---
+
+## 11. Export / Import
+
+- **⬇ Export** — downloads your board as a `.json` backup file.
+- **⬆ Import** — restores a backup onto your own board. You must re-enter your
+  password to confirm, as importing permanently overwrites everything currently
+  on the board.
+
+---
+
+## 12. Profile pictures
+
+Click the small 📷 button on your own member tab to upload a photo. The image
+is cropped and stored as your avatar. Admins can set or update anyone's photo.
+
+---
 
 ## 13. Your data
 
-Everything is stored live in the lab's shared database and synced instantly
-to every signed-in computer — there's no local file, no drive to map, and no
-manual sync step. Only signed-in lab members can read or write anything; the
-permission rules are enforced on the server, not just in this page.
+All data is stored in the lab's shared Firebase database and syncs instantly to
+every signed-in device. Access is enforced server-side — only authenticated lab
+members can read or write anything.
 
-Use **⬇ Export** any time to download your own board as a `.json` backup.
-**⬆ Import** restores a backup into your own board (never someone else's).
+---
 
 ## For admins
 
-- **👥 Manage Members** (top right, visible only to admins) lets you rename a
-  member, promote/demote other admins, unlock a commit, or remove a member's
-  profile.
-- New logins are created in the Firebase Console (Authentication → Users),
-  not from inside the app — a member's profile then appears automatically
-  the first time they sign in.
+### Header controls
+
+| Button | What it does |
+|---|---|
+| **⚙ Admin Controls ▾** | Opens a dropdown with member-level data entry settings |
+| **🔓 Admin** (badge) | Toggle between your full admin view and a regular-member preview of the board |
+| **🚪 Sign Out** | Signs you out |
+
+### ⚙ Admin Controls menu
+
+- **📅 Data entry controls** — restrict which dates a member can use for new
+  entries. Options: this week and next, no restriction, from their last commit
+  onward, or a custom date range. Can be applied to one member or all at once.
+
+### 👥 Manage Members
+
+Click **⚙ Admin Controls ▾ → Manage Members** to:
+
+| Action | What it does |
+|---|---|
+| **Rename** | Change a member's display name |
+| **Make admin / Remove admin** | Promote or demote admin status |
+| **Mark as current / past** | Controls which sidebar tab (Current or Past) the member appears under |
+| **Unlock** | Remove a commit lock so a member can edit their previous entries again |
+| **Remove** | Delete the member's profile and all their data from Firestore |
+| **Create Account** | Add a new member by email + display name — they receive a password-setup email automatically; nobody sees their password |
+
+> **Note:** Removing a member's profile here does not remove their Firebase
+> Authentication login. Delete that separately in the Firebase Console
+> (Authentication → Users) if needed.
+
+### Destructive actions require password confirmation
+
+Admins must re-enter their password before:
+- Deleting a node
+- Deleting a project
+- Deleting a description point
+- Importing a backup (overwrites the board)
+
+---
 
 ## Tips
 
-- If the map looks empty or you want to reset the camera, click **Reset
-  View** in the bottom-right corner.
-- Changes from other members can appear while you're looking at their board
-  — that's expected, it's live.
+- If the map looks empty or the camera drifted, click **Reset View** in the
+  bottom-right corner.
+- Live updates from other members appear while you're viewing their board —
+  that's expected behavior.
+- The sidebar's **Current / Past** toggle lets you archive members who have left
+  the lab without deleting their data.
