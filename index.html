@@ -1874,10 +1874,24 @@ function showTopicDetail(n) {
   const conns = (m.connections || []).filter(c => c.a === n.id || c.b === n.id)
     .map(c => findNode(m, c.a === n.id ? c.b : c.a)).filter(Boolean);
   const wk = weekOfYear(n.date);
-  const bullets = (n.bullets || []).filter(b => b && b.trim());
-  const bulletsHtml = bullets.length
-    ? `<ol class="d-bullets">${bullets.map(b => `<li>${escapeHtml(b)}</li>`).join('')}</ol>`
-    : `<div style="font-size:11px;color:rgba(255,255,255,.4)">No points yet — hover this entry in the map to add some.</div>`;
+  const canEdit = canEditNode(n);
+  const allBullets = n.bullets || [];
+  let bulletsHtml;
+  if (canEdit) {
+    const rows = allBullets.map((b, i) => `
+      <div class="bullet-row">
+        <span class="bullet-mark">•</span>
+        <textarea class="bullet-textarea pd-textarea" data-idx="${i}" rows="1" placeholder="Type a point…" oninput="autoGrowTextarea(this); updateTopicBullet('${n.id}', ${i}, this.value)">${escapeHtml(b)}</textarea>
+        <span class="pd-remove" onclick="removeTopicBullet('${n.id}', ${i})" title="Remove this point">✕</span>
+      </div>`).join('');
+    bulletsHtml = `<div class="bullet-list">${rows}</div>
+      <button class="pd-add" type="button" onclick="addTopicBullet('${n.id}')">+ Add description</button>`;
+  } else {
+    const visible = allBullets.filter(b => b && b.trim());
+    bulletsHtml = visible.length
+      ? `<ol class="d-bullets">${visible.map(b => `<li>${escapeHtml(b)}</li>`).join('')}</ol>`
+      : `<div style="font-size:11px;color:rgba(255,255,255,.4)">No points yet.</div>`;
+  }
   let html = `
     <div class="d-title">${escapeHtml(n.text)}</div>
     <div class="d-date">${n.date ? ('🗓 ' + formatDate(n.date)) : 'No date set'} · Week ${wk.weekNum} (${formatWeekRange(wk.weekStart, wk.weekEnd)})</div>
@@ -1906,11 +1920,41 @@ function showTopicDetail(n) {
   if (!canEditBoard()) html += `<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:14px">👀 Read-only — this isn't your board.</div>`;
   else if (isNodeLocked(n)) html += `<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:14px">🔒 Committed — locked from editing.</div>`;
   document.getElementById('detail-content').innerHTML = html;
+  document.querySelectorAll('#detail-content .pd-textarea').forEach(autoGrowTextarea);
   document.getElementById('node-actions').classList.toggle('visible', canEditNode(n));
   resizeMapForPanel();
 }
+function addTopicBullet(nodeId) {
+  const m = activeMember(); if (!m || !canEditBoard()) return;
+  const n = findNode(m, nodeId); if (!n || !canEditNode(n)) return;
+  n.bullets = n.bullets || [];
+  n.bullets.push('');
+  save();
+  showTopicDetail(findNode(activeMember(), nodeId));
+  const areas = document.querySelectorAll('#detail-content .pd-textarea');
+  const last = areas[areas.length - 1];
+  if (last) last.focus();
+}
+function updateTopicBullet(nodeId, idx, value) {
+  const m = activeMember(); if (!m || !canEditBoard()) return;
+  const n = findNode(m, nodeId); if (!n || !canEditNode(n)) return;
+  if (!n.bullets) return;
+  n.bullets[idx] = value;
+  save();
+}
+function removeTopicBullet(nodeId, idx) {
+  const m = activeMember(); if (!m || !canEditBoard()) return;
+  const n = findNode(m, nodeId); if (!n || !canEditNode(n)) return;
+  if (!n.bullets) return;
+  const doRemove = () => { n.bullets.splice(idx, 1); save(); showTopicDetail(findNode(activeMember(), nodeId)); };
+  if (isAdmin) { openDeleteConfirm('Delete this description point? This cannot be undone.', doRemove); return; }
+  doRemove();
+}
 
-function renderAll() { closeDetail(); buildD3Map(); }
+function renderAll() {
+  if (!document.getElementById('detail-panel').contains(document.activeElement)) closeDetail();
+  buildD3Map();
+}
 
 // ── CALENDAR WEEK HELPERS ────────────────────────────────────────────────
 // Real calendar weeks, Sunday through Saturday — the week a date belongs to is whichever
