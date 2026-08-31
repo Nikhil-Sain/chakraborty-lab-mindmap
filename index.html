@@ -1678,11 +1678,24 @@ function addNodeOfType(kind, presetDate) {
   const proj = m.projects.find(p => p.id === m.lastProjectId) || m.projects[0];
   const anchor = m.lastTopicId ? findNode(m, m.lastTopicId) : null;
   const title = anchor ? `Add ${label} under "${truncate(anchor.text, 26)}"` : `Add ${label} to "${proj.name}"`;
+  // Capture IDs only — the live objects may be replaced by a Firestore refresh
+  // while the modal is open, making any captured references stale.
+  const anchorId = anchor ? anchor.id : null;
+  const projId = proj ? proj.id : null;
   openNodeModal(title, '', presetDate || todayStr(), (text, dateVal) => {
+    const cur = activeMember(); if (!cur || !canEditBoard()) return;
     const newTopic = { id: genId(), text, date: dateVal, kind, bullets: [], createdAt: Date.now(), children: [] };
-    if (anchor) { anchor.children = anchor.children || []; anchor.children.push(newTopic); }
-    else { newTopic.projectId = proj.id; m.topics.push(newTopic); }
-    m.lastTopicId = newTopic.id;
+    const curAnchor = anchorId ? findNode(cur, anchorId) : null;
+    if (curAnchor) {
+      curAnchor.children = curAnchor.children || [];
+      curAnchor.children.push(newTopic);
+    } else {
+      const curProj = cur.projects.find(p => p.id === projId) || cur.projects[0];
+      if (!curProj) return;
+      newTopic.projectId = curProj.id;
+      cur.topics.push(newTopic);
+    }
+    cur.lastTopicId = newTopic.id;
     save(); buildD3Map();
   });
 }
@@ -1690,15 +1703,18 @@ function addNodeOfType(kind, presetDate) {
 function renameNode(id) {
   const m = activeMember(); const node = findNode(m, id); if (!node || !canEditNode(node)) return;
   openNodeModal('Edit Node', node.text, node.date, (text, dateVal) => {
-    const oldWeek = weekOfYear(node.date).absIdx;
-    node.text = text; node.date = dateVal;
+    // Re-fetch the live node — a Firestore refresh while the modal was open may have
+    // replaced the member objects, making the outer `node` reference stale.
+    const cur = findNode(activeMember(), id); if (!cur || !canEditNode(cur)) return;
+    const oldWeek = weekOfYear(cur.date).absIdx;
+    cur.text = text; cur.date = dateVal;
     // manualX/manualY snapshot the cell's exact pixel slot from whenever it was last
     // dragged — those pixels belong to its OLD week column. If the corrected date lands in
     // a different week, that stale position has to be cleared (not just left stale) or the
     // node keeps rendering in its old column regardless of what the date now says.
-    if (weekOfYear(node.date).absIdx !== oldWeek) { delete node.manualY; delete node.manualX; }
+    if (weekOfYear(cur.date).absIdx !== oldWeek) { delete cur.manualY; delete cur.manualX; }
     save(); buildD3Map();
-    if (detailTopicId === id) showTopicDetail(node);
+    if (detailTopicId === id) showTopicDetail(cur);
   }, node);
 }
 // Switches a node between Node / Sub Node / Micro Node — only its shape/color/size
