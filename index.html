@@ -204,7 +204,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 #dc-confirm-btn:hover{background:#b91c1c}
 
 /* ── Inline description card (on the node itself) — a bullet-point list ── */
-.desc-card-inner{background:linear-gradient(160deg,#1e1b4b,#312e81);border:1.5px solid #818cf8;border-radius:8px;padding:8px;box-shadow:0 14px 30px rgba(49,46,129,.4),0 4px 12px rgba(0,0,0,.2);max-height:220px;overflow-y:auto;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif}
+.desc-card-inner{background:linear-gradient(160deg,#1e1b4b,#312e81);border:1.5px solid #818cf8;border-radius:8px;padding:8px;box-shadow:0 14px 30px rgba(49,46,129,.4),0 4px 12px rgba(0,0,0,.2);overflow:visible;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif}
 .bullet-list{display:flex;flex-direction:column;gap:4px;margin-bottom:6px}
 .bullet-row{display:flex;align-items:flex-start;gap:5px}
 .bullet-mark{color:#c4b5fd;font-size:14px;line-height:1.5;flex-shrink:0;padding-top:4px}
@@ -2702,7 +2702,7 @@ function mapUpdate(source) {
   // Review status, always shown (even to admin, who bypasses the actual edit-lock) — red
   // while it's new since the last commit, yellow once it's been committed and locked in. A
   tE.append('text').attr('class', 'lock-badge').attr('font-size', 11).style('pointer-events', 'none').style('display', 'none').text('🔒');
-  tE.append('foreignObject').attr('class', 'desc-card').attr('width', 220).attr('height', 190).attr('y', -20).style('display', 'none')
+  tE.append('foreignObject').attr('class', 'desc-card').attr('width', 220).attr('height', 1000).attr('y', -20).style('display', 'none')
     .on('mouseenter', () => cancelHideHoverCard())
     .on('mouseleave', () => scheduleHideHoverCard());
 
@@ -3193,13 +3193,25 @@ function buildDescCardHtml(n, editable) {
 // Hovering a topic reveals its bullet-point popup next to it, and hovering into the popup
 // itself (instead of just the cell) keeps it open so it stays editable.
 let hoverCardNodeId = null, hoverHideTimer = null;
+function fitDescCard(fo) {
+  const innerEl = fo.select('.desc-card-inner').node();
+  if (!innerEl) return;
+  // Let the browser finish laying out the foreignObject content, then snap the
+  // foreignObject height to the content's natural height so no scrollbar appears.
+  requestAnimationFrame(() => {
+    const h = innerEl.getBoundingClientRect().height;
+    if (h > 0) fo.attr('height', Math.ceil(h) + 12);
+  });
+}
 function wireDescCard(fo, n, d, g) {
   const editable = canEditNode(n);
+  fo.attr('height', 1000); // unconstrained while measuring
   fo.html(buildDescCardHtml(n, editable));
   const inner = fo.select('.desc-card-inner');
   inner.on('mousedown', e => e.stopPropagation());
   inner.on('click', e => e.stopPropagation());
   fo.selectAll('.bullet-textarea').each(function () { autoGrowTextarea(this); });
+  fitDescCard(fo);
   if (!editable) return;
   // Capture the node ID only — the object reference `n` becomes stale after
   // renderAll() replaces data.members with fresh Firestore data. Re-fetching by id
@@ -3209,6 +3221,7 @@ function wireDescCard(fo, n, d, g) {
     .on('input', function () {
       applyWordCap(this, BULLET_MAX_WORDS);
       autoGrowTextarea(this);
+      fitDescCard(fo);
     })
     .on('blur', function () {
       const idx = +this.getAttribute('data-idx');
