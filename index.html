@@ -1216,7 +1216,11 @@ document.addEventListener('keydown', e => {
     const canDel = canEditBoard() && (isAdmin || !(m && m.committedAt));
     if (!canDel) return;
     const active = document.activeElement;
-    const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+    // Allow Delete even if a thread-menu input (e.g. color picker) has focus —
+    // block only when a real text field outside the menu is being edited.
+    const isTyping = active &&
+      (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable) &&
+      !active.closest('#thread-menu');
     if (!isTyping) { e.preventDefault(); threadRemove(); }
   }
 });
