@@ -2610,13 +2610,19 @@ function mapUpdate(source) {
     connFanOffset.set(conn.id, { oa, ob });
     const fa = applyOffset(pa, oa), fb = applyOffset(pb, ob);
     const cornerA = edgeAnchor(fa, fb), cornerB = edgeAnchor(fb, fa);
+    const connPath = curvePath(fa, fb);
+    // Invisible wide hit-area so users can click anywhere near the line, not just the 2px stroke.
+    mapInner.insert('path', '.map-node').attr('class', 'conn-hit').attr('data-conn', conn.id)
+      .attr('fill', 'none').attr('stroke', 'transparent').attr('stroke-width', 14)
+      .style('cursor', 'pointer').style('pointer-events', 'stroke')
+      .attr('d', connPath)
+      .on('click', (event) => openThreadMenu(event, { type: 'conn', id: conn.id }))
+      .append('title').text('Click the line to change its color, style, or remove it · drag an endpoint dot to re-plug it');
     mapInner.insert('path', '.map-node').attr('class', 'conn-link').attr('data-conn', conn.id)
       .attr('fill', 'none').attr('stroke', col).attr('stroke-opacity', 0.85).attr('stroke-width', selected ? THREAD_WIDTH + 1.5 : THREAD_WIDTH)
       .attr('stroke-dasharray', (conn.style || 'solid') === 'dashed' ? '6,4' : null)
-      .style('cursor', 'pointer').style('pointer-events', 'stroke')
-      .attr('d', curvePath(fa, fb))
-      .on('click', (event) => openThreadMenu(event, { type: 'conn', id: conn.id }))
-      .append('title').text('Click the line to change its color, style, or remove it · drag an endpoint dot to re-plug it');
+      .style('pointer-events', 'none')
+      .attr('d', connPath);
     const midArrow = curveMidArrow(fa, fb);
     mapInner.insert('path', '.map-node').attr('class', 'conn-arrow').attr('data-conn', conn.id)
       .attr('d', ARROW_SHAPE).attr('fill', col).style('pointer-events', 'none')
