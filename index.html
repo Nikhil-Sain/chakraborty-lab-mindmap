@@ -1211,7 +1211,10 @@ function threadRemove() {
 document.addEventListener('click', e => { if (!e.target.closest('#thread-menu')) closeThreadMenu(); });
 document.addEventListener('keydown', e => {
   if ((e.key === 'Delete' || e.key === 'Backspace') &&
-      threadTarget && threadTarget.type === 'conn' && isAdmin) {
+      threadTarget && threadTarget.type === 'conn') {
+    const m = activeMember();
+    const canDel = canEditBoard() && (isAdmin || !(m && m.committedAt));
+    if (!canDel) return;
     const active = document.activeElement;
     const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
     if (!isTyping) { e.preventDefault(); threadRemove(); }
