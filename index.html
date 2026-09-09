@@ -1177,7 +1177,16 @@ function openThreadMenu(event, target) {
   menu.querySelectorAll('.thread-style-btn').forEach(b => b.classList.toggle('active', b.dataset.style === style));
   document.getElementById('thread-color-input').value = color;
   document.getElementById('thread-menu-type').textContent = isConn ? 'Cross-topic connection' : 'Hierarchy link';
-  document.getElementById('thread-del-btn').style.display = isConn ? 'block' : 'none';
+  const delBtn = document.getElementById('thread-del-btn');
+  const m = activeMember();
+  const canDel = canEditBoard() && (isAdmin || !(m && m.committedAt));
+  if (isConn) {
+    delBtn.textContent = '✕ Remove connection';
+    delBtn.style.display = canDel ? 'block' : 'none';
+  } else {
+    delBtn.textContent = '⤴ Detach from parent';
+    delBtn.style.display = canDel ? 'block' : 'none';
+  }
   menu.style.left = event.clientX + 'px';
   menu.style.top = event.clientY + 'px';
   menu.classList.add('open');
@@ -1210,10 +1219,35 @@ function threadPickPaletteColor(c) {
   document.getElementById('thread-color-input').value = c;
   threadColorChanged({ target: { value: c } });
 }
+function detachFromParent(nodeId) {
+  const m = activeMember(); if (!m || !canEditBoard()) return;
+  let detached = null, parentProjectId = null;
+  function findAndRemove(nodes, projId) {
+    for (const n of nodes) {
+      const pid = n.projectId || projId;
+      const ch = n.children || [];
+      const idx = ch.findIndex(c => c.id === nodeId);
+      if (idx >= 0) { detached = ch.splice(idx, 1)[0]; parentProjectId = pid; return true; }
+      if (findAndRemove(ch, pid)) return true;
+    }
+    return false;
+  }
+  findAndRemove(m.topics || [], null);
+  if (detached) {
+    detached.kind = 'node';
+    if (parentProjectId) detached.projectId = parentProjectId;
+    (m.topics || (m.topics = [])).push(detached);
+    save(); buildD3Map();
+  }
+}
 function threadRemove() {
-  if (threadTarget && threadTarget.type === 'conn') {
+  if (!threadTarget) return;
+  if (threadTarget.type === 'conn') {
     const conn = threadRef();
     if (conn) removeConnection(conn.a, conn.b);
+  } else if (threadTarget.type === 'tree') {
+    const node = threadRef();
+    if (node) detachFromParent(node.id);
   }
   closeThreadMenu();
 }
