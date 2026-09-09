@@ -2882,8 +2882,10 @@ function nodePos(d) {
 // Re-applies a previously captured fan nudge (see treeLinkFanOffset/connFanOffset) to a
 // freshly computed position — used so a live-dragged endpoint keeps the same fanned-out slot
 // its line/handle was already drawn at, instead of jumping to the node's raw center.
+// origX/origY preserve the unshifted node boundary so edgeAnchor can land exactly on the
+// cell edge rather than offset past it or into it.
 function applyOffset(pos, off) {
-  return off ? { ...pos, x: pos.x + off.dx, y: pos.y + off.dy } : pos;
+  return off ? { ...pos, origX: pos.x, origY: pos.y, x: pos.x + off.dx, y: pos.y + off.dy } : pos;
 }
 // A thread anchors at the center of whichever edge (left/right/top/bottom) of the cell
 // faces the OTHER end of that thread, touching the cell's actual boundary exactly (no gap).
@@ -2891,15 +2893,22 @@ function applyOffset(pos, off) {
 // to the front of the drawing order, regardless of what cell geometry is under them.
 // Point-like positions (root circles, or a connection end mid-drag under the cursor) have
 // no width, so they pass through unchanged.
+// When a fan offset has been applied, origX/origY hold the actual (unshifted) node boundary
+// so the anchor always lands on the real edge. The shifted pos.x/pos.y is used for the
+// orthogonal component (spreading lines along the edge) and for the towardX distance test,
+// keeping the correct edge selected while the endpoint stays on the cell boundary.
 function edgeAnchor(pos, other) {
   if (!pos.w) return { x: pos.x, y: pos.y };
   const towardX = other.x + (other.w || 0) / 2, towardY = other.y;
-  const w = pos.w, h = pos.h || 0, cx = pos.x + w / 2;
+  const w = pos.w, h = pos.h || 0;
+  const ox = pos.origX !== undefined ? pos.origX : pos.x;
+  const oy = pos.origY !== undefined ? pos.origY : pos.y;
+  const cx = pos.x + w / 2;  // shifted center x — used to spread top/bottom anchors
   const edges = [
-    { x: pos.x, y: pos.y },
-    { x: pos.x + w, y: pos.y },
-    { x: cx, y: pos.y - h / 2 },
-    { x: cx, y: pos.y + h / 2 }
+    { x: ox, y: pos.y },           // left edge: x at actual boundary, y spread by fan
+    { x: ox + w, y: pos.y },       // right edge: x at actual boundary, y spread by fan
+    { x: cx, y: oy - h / 2 },      // top edge: y at actual boundary, x spread by fan
+    { x: cx, y: oy + h / 2 }       // bottom edge: y at actual boundary, x spread by fan
   ];
   let best = edges[0], bestDist = Infinity;
   edges.forEach(e => {
