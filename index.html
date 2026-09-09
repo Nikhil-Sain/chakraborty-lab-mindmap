@@ -1221,19 +1221,21 @@ function threadPickPaletteColor(c) {
 }
 function detachFromParent(nodeId) {
   const m = activeMember(); if (!m || !canEditBoard()) return;
-  let detached = null;
-  function findAndRemove(nodes) {
+  let detached = null, projectId = null;
+  function findAndRemove(nodes, pid) {
     for (const n of nodes) {
+      const resolvedPid = n.projectId || pid;
       const ch = n.children || [];
       const idx = ch.findIndex(c => c.id === nodeId);
-      if (idx >= 0) { detached = ch.splice(idx, 1)[0]; return true; }
-      if (findAndRemove(ch)) return true;
+      if (idx >= 0) { detached = ch.splice(idx, 1)[0]; projectId = resolvedPid; return true; }
+      if (findAndRemove(ch, resolvedPid)) return true;
     }
     return false;
   }
-  findAndRemove(m.topics || []);
+  findAndRemove(m.topics || [], null);
   if (detached) {
     detached.standalone = true;
+    if (projectId) detached.projectId = projectId;
     (m.topics || (m.topics = [])).push(detached);
     save(); buildD3Map();
   }
@@ -1814,8 +1816,15 @@ function deleteNode(id) {
     const curNode = curArr[curIdx];
     const curKids = curNode.children || [];
     pruneConnections(curM, [id]);
+    const inheritPid = curNode.projectId || (function findPid(nodes, pid) {
+      for (const n of nodes) {
+        if (n.id === id) return n.projectId || pid;
+        const r = findPid(n.children || [], n.projectId || pid);
+        if (r) return r;
+      }
+    })(curM.topics || [], null);
     curArr.splice(curIdx, 1);
-    curKids.forEach(k => { k.standalone = true; (curM.topics || (curM.topics = [])).push(k); });
+    curKids.forEach(k => { k.standalone = true; if (inheritPid) k.projectId = inheritPid; (curM.topics || (curM.topics = [])).push(k); });
     if (curM.lastTopicId === id) curM.lastTopicId = null;
     save(); closeDetail(); buildD3Map();
   };
