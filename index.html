@@ -1805,7 +1805,7 @@ function deleteNode(id) {
   if (!canEditNode(node)) return;
   const kids = node.children || [];
   const msg = kids.length
-    ? `Delete "${node.text}"? Its ${kids.length} sub-node${kids.length !== 1 ? 's' : ''} will move up in its place.`
+    ? `Delete "${node.text}"? Its ${kids.length} sub-node${kids.length !== 1 ? 's' : ''} will remain as standalone floating nodes.`
     : `Delete "${node.text}"?`;
   const doDelete = () => {
     const curM = activeMember(); if (!curM) return;
@@ -1814,11 +1814,8 @@ function deleteNode(id) {
     const curNode = curArr[curIdx];
     const curKids = curNode.children || [];
     pruneConnections(curM, [id]);
-    // A top-level topic carries its project on itself (its parent array is curM.topics, not
-    // another node's children) — promoted children need that same projectId, or they'd be
-    // silently filtered out of every project (i.e. vanish from the map) once spliced in.
-    if (curNode.projectId) curKids.forEach(k => { k.projectId = curNode.projectId; });
-    curArr.splice(curIdx, 1, ...curKids);
+    curArr.splice(curIdx, 1);
+    curKids.forEach(k => { k.standalone = true; (curM.topics || (curM.topics = [])).push(k); });
     if (curM.lastTopicId === id) curM.lastTopicId = null;
     save(); closeDetail(); buildD3Map();
   };
