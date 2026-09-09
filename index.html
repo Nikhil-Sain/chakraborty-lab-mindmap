@@ -1221,21 +1221,19 @@ function threadPickPaletteColor(c) {
 }
 function detachFromParent(nodeId) {
   const m = activeMember(); if (!m || !canEditBoard()) return;
-  let detached = null, parentProjectId = null;
-  function findAndRemove(nodes, projId) {
+  let detached = null;
+  function findAndRemove(nodes) {
     for (const n of nodes) {
-      const pid = n.projectId || projId;
       const ch = n.children || [];
       const idx = ch.findIndex(c => c.id === nodeId);
-      if (idx >= 0) { detached = ch.splice(idx, 1)[0]; parentProjectId = pid; return true; }
-      if (findAndRemove(ch, pid)) return true;
+      if (idx >= 0) { detached = ch.splice(idx, 1)[0]; return true; }
+      if (findAndRemove(ch)) return true;
     }
     return false;
   }
-  findAndRemove(m.topics || [], null);
+  findAndRemove(m.topics || []);
   if (detached) {
-    detached.kind = 'node';
-    if (parentProjectId) detached.projectId = parentProjectId;
+    detached.standalone = true;
     (m.topics || (m.topics = [])).push(detached);
     save(); buildD3Map();
   }
@@ -2347,7 +2345,10 @@ function mapUpdate(source) {
   // The hierarchy's actual root is an invisible '__super__' wrapper (so several project
   // roots can coexist under one d3.hierarchy) — filter it out of what actually renders.
   const nodes = mapRoot.descendants().filter(d => d.data.type !== 'super');
-  const links = mapRoot.links().filter(l => l.source.data.type !== 'super');
+  const links = mapRoot.links().filter(l =>
+    l.source.data.type !== 'super' &&
+    !(l.target.data.nodeRef && l.target.data.nodeRef.standalone)
+  );
 
   // Pass 1 — each week column is wide enough for its header; topics no longer force the
   // column wider — long text wraps onto extra lines (and the cell grows taller) instead.
