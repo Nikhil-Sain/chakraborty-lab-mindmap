@@ -102,6 +102,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .thread-style-btn{padding:6px 10px;border-radius:6px;border:1.5px solid #e5e7eb;background:#f3f4f6;color:#374151;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
 .thread-style-btn:hover{background:#e5e7eb}
 .thread-style-btn.active{background:#7c3aed;border-color:#7c3aed;color:#fff}
+.thread-menu-type{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#6366f1;padding-bottom:2px;border-bottom:1px solid #e0e7ff;margin-bottom:1px}
 .thread-del-btn{padding:6px 10px;border-radius:6px;border:none;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
 .thread-del-btn{background:#fee2e2;color:#991b1b}
 .thread-del-btn:hover{background:#fecaca}
@@ -427,6 +428,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 
 <!-- ── THREAD (CONNECTOR LINE) EDITOR ── -->
 <div id="thread-menu" class="thread-menu">
+  <div id="thread-menu-type" class="thread-menu-type"></div>
   <div class="thread-menu-row">
     <button class="thread-style-btn" data-style="solid" onclick="threadSetStyle('solid')">── Solid</button>
     <button class="thread-style-btn" data-style="dashed" onclick="threadSetStyle('dashed')">┈┈ Dotted</button>
@@ -1168,6 +1170,7 @@ function openThreadMenu(event, target) {
   const menu = document.getElementById('thread-menu');
   menu.querySelectorAll('.thread-style-btn').forEach(b => b.classList.toggle('active', b.dataset.style === style));
   document.getElementById('thread-color-input').value = color;
+  document.getElementById('thread-menu-type').textContent = isConn ? 'Cross-topic connection' : 'Hierarchy link';
   document.getElementById('thread-del-btn').style.display = isConn ? 'block' : 'none';
   menu.style.left = event.clientX + 'px';
   menu.style.top = event.clientY + 'px';
