@@ -1163,7 +1163,7 @@ function openThreadMenu(event, target) {
   threadTarget = target;
   const ref = threadRef(); if (!ref) return;
   const isConn = threadTarget.type === 'conn';
-  const style = isConn ? (ref.style || 'dashed') : (ref.linkStyle || 'solid');
+  const style = isConn ? (ref.style || 'solid') : (ref.linkStyle || 'solid');
   const color = (isConn ? ref.color : ref.linkColor) || (isConn ? DEFAULT_CONN_COLOR : DEFAULT_TREE_COLOR);
   const menu = document.getElementById('thread-menu');
   menu.querySelectorAll('.thread-style-btn').forEach(b => b.classList.toggle('active', b.dataset.style === style));
@@ -1833,7 +1833,7 @@ function toggleConnectRow(id) {
   const m = activeMember();
   const exists = m.connections.some(c => (c.a === connectFromId && c.b === id) || (c.a === id && c.b === connectFromId));
   if (exists) m.connections = m.connections.filter(c => !((c.a === connectFromId && c.b === id) || (c.a === id && c.b === connectFromId)));
-  else m.connections.push({ id: genId(), a: connectFromId, b: id, color: DEFAULT_CONN_COLOR });
+  else m.connections.push({ id: genId(), a: connectFromId, b: id, color: DEFAULT_CONN_COLOR, style: 'solid' });
   save(); renderConnectList();
 }
 
@@ -2612,7 +2612,7 @@ function mapUpdate(source) {
     const cornerA = edgeAnchor(fa, fb), cornerB = edgeAnchor(fb, fa);
     mapInner.insert('path', '.map-node').attr('class', 'conn-link').attr('data-conn', conn.id)
       .attr('fill', 'none').attr('stroke', col).attr('stroke-opacity', 0.85).attr('stroke-width', selected ? THREAD_WIDTH + 1.5 : THREAD_WIDTH)
-      .attr('stroke-dasharray', (conn.style || 'dashed') === 'dashed' ? '6,4' : null)
+      .attr('stroke-dasharray', (conn.style || 'solid') === 'dashed' ? '6,4' : null)
       .style('cursor', 'pointer').style('pointer-events', 'stroke')
       .attr('d', curvePath(fa, fb))
       .on('click', (event) => openThreadMenu(event, { type: 'conn', id: conn.id }))
