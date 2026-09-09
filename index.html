@@ -1158,7 +1158,11 @@ const TOPIC_FONT = "10.5px 'Segoe UI', system-ui, sans-serif";
 let threadTarget = null; // { type: 'tree'|'conn', id }
 function threadRef() {
   const m = activeMember(); if (!m || !threadTarget) return null;
-  return threadTarget.type === 'conn' ? findConnection(m, threadTarget.id) : findNode(m, threadTarget.id);
+  if (threadTarget.type === 'conn') {
+    return findConnection(m, threadTarget.id) ||
+           findConnectionByEndpoints(m, threadTarget.a, threadTarget.b);
+  }
+  return findNode(m, threadTarget.id);
 }
 function openThreadMenu(event, target) {
   event.stopPropagation();
@@ -1799,7 +1803,10 @@ function removeConnection(a, b) {
   save(); buildD3Map();
   if (detailTopicId === a || detailTopicId === b) { const n = findNode(m, detailTopicId); if (n) showTopicDetail(n); }
 }
-function findConnection(m, id) { return (m.connections || []).find(c => c.id === id) || null; }
+function findConnection(m, id) { return id ? ((m.connections || []).find(c => c.id === id) || null) : null; }
+function findConnectionByEndpoints(m, a, b) {
+  return (m.connections || []).find(c => (c.a === a && c.b === b) || (c.a === b && c.b === a)) || null;
+}
 
 // ── CONNECT MODAL ────────────────────────────────────────────────────────
 function openConnectModal(nodeId) {
@@ -2602,13 +2609,17 @@ function mapUpdate(source) {
   // cross-topic connection overlay (re-pluggable) — same curved routing, with a direction
   // arrow sitting at the curve's midpoint; clicking the line opens the same color/style
   // editor, and reveals its own end-handles (only the selected connection's are shown).
-  mapInner.selectAll('.conn-link, .conn-handle, .conn-arrow').remove();
+  mapInner.selectAll('.conn-link, .conn-handle, .conn-arrow, .conn-hit').remove();
   connFanOffset = new Map();
   (m.connections || []).forEach(conn => {
     const pa = mapNodePositions[conn.a], pb = mapNodePositions[conn.b];
     if (!pa || !pb) return;
     const col = conn.color || DEFAULT_CONN_COLOR;
-    const selected = threadTarget && threadTarget.type === 'conn' && threadTarget.id === conn.id;
+    const tt = threadTarget;
+    const selected = tt && tt.type === 'conn' && (
+      (tt.id && tt.id === conn.id) ||
+      (!tt.id && !conn.id && tt.a === conn.a && tt.b === conn.b)
+    );
     const oa = fanOffset(conn.a), ob = fanOffset(conn.b);
     connFanOffset.set(conn.id, { oa, ob });
     const fa = applyOffset(pa, oa), fb = applyOffset(pb, ob);
@@ -2619,7 +2630,7 @@ function mapUpdate(source) {
       .attr('fill', 'none').attr('stroke', 'transparent').attr('stroke-width', 14)
       .style('cursor', 'pointer').style('pointer-events', 'stroke')
       .attr('d', connPath)
-      .on('click', (event) => openThreadMenu(event, { type: 'conn', id: conn.id }))
+      .on('click', (event) => openThreadMenu(event, { type: 'conn', id: conn.id, a: conn.a, b: conn.b }))
       .append('title').text('Click the line to change its color, style, or remove it · drag an endpoint dot to re-plug it');
     mapInner.insert('path', '.map-node').attr('class', 'conn-link').attr('data-conn', conn.id)
       .attr('fill', 'none').attr('stroke', col).attr('stroke-opacity', 0.85).attr('stroke-width', selected ? THREAD_WIDTH + 1.5 : THREAD_WIDTH)
