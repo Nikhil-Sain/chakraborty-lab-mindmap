@@ -1209,6 +1209,14 @@ function threadRemove() {
   closeThreadMenu();
 }
 document.addEventListener('click', e => { if (!e.target.closest('#thread-menu')) closeThreadMenu(); });
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Delete' || e.key === 'Backspace') &&
+      threadTarget && threadTarget.type === 'conn' && isAdmin) {
+    const active = document.activeElement;
+    const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+    if (!isTyping) { e.preventDefault(); threadRemove(); }
+  }
+});
 
 // Migrate any older saved data (weeks were once user-managed containers) into the flat topics model,
 // and backfill fields added later (createdAt / bullet-point description) on pre-existing topics.
