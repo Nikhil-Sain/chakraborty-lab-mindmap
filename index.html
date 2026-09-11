@@ -216,6 +216,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .desc-card-inner{background:linear-gradient(160deg,#1e1b4b,#312e81);border:1.5px solid #818cf8;border-radius:8px;padding:8px;box-shadow:0 14px 30px rgba(49,46,129,.4),0 4px 12px rgba(0,0,0,.2);overflow:visible;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif}
 .bullet-list{display:flex;flex-direction:column;gap:4px;margin-bottom:6px}
 .bullet-row{display:flex;align-items:flex-start;gap:5px}
+.bullet-drag-handle{cursor:grab;color:rgba(255,255,255,.3);font-size:13px;flex-shrink:0;padding:3px 1px 0;user-select:none;line-height:1}
+.bullet-drag-handle:hover{color:rgba(255,255,255,.7)}
+.bullet-drag-handle:active{cursor:grabbing}
+.bullet-row.bullet-drag-over{background:rgba(129,140,248,0.1);border-radius:6px;outline:1.5px dashed #818cf8;outline-offset:1px}
 .bullet-mark{color:#c4b5fd;font-size:14px;line-height:1.5;flex-shrink:0;padding-top:4px}
 .bullet-textarea{flex:1;min-height:24px;background:#ffffff;border:1px solid #c7d2fe;border-radius:6px;color:#1e293b;font-size:11px;font-family:inherit;padding:5px 7px;resize:none;outline:none;overflow:hidden;box-sizing:border-box}
 .bullet-textarea:focus{border-color:#818cf8}
@@ -225,6 +229,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .bullet-add:hover{border-color:#c4b5fd;color:#c4b5fd}
 .bullet-hint{margin-top:6px;font-size:9.5px;color:rgba(255,255,255,.4);text-align:center}
 /* ── Project description points, in the (light) detail panel — same bullet-row layout, dark-panel-safe colors ── */
+.pd-drag-handle{cursor:grab;color:#9ca3af;font-size:13px;flex-shrink:0;padding:3px 1px 0;user-select:none;line-height:1}
+.pd-drag-handle:hover{color:#6366f1}
+.pd-drag-handle:active{cursor:grabbing}
+.detail-bullet-row.bullet-drag-over{background:rgba(99,102,241,0.08);border-radius:6px;outline:1.5px dashed #818cf8;outline-offset:1px}
 .pd-remove{cursor:pointer;color:#9ca3af;font-size:10px;flex-shrink:0;padding:6px 1px 0}
 .pd-remove:hover{color:#f87171}
 .pd-add{width:100%;padding:6px;border:1.5px dashed #c7d2fe;border-radius:6px;background:transparent;color:#7c3aed;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:14px}
@@ -1989,9 +1997,14 @@ function showTopicDetail(n) {
   let bulletsHtml;
   if (canEdit) {
     const rows = allBullets.map((b, i) => `
-      <div class="bullet-row">
-        <span class="bullet-mark">•</span>
-        <textarea class="bullet-textarea pd-textarea" data-idx="${i}" rows="1" placeholder="Type a point…" oninput="autoGrowTextarea(this); updateTopicBullet('${n.id}', ${i}, this.value)">${escapeHtml(b)}</textarea>
+      <div class="bullet-row detail-bullet-row" draggable="true"
+        ondragstart="event.dataTransfer.setData('text/plain','');window._bDrag={id:'${n.id}',i:${i}}"
+        ondragover="event.preventDefault();this.classList.add('bullet-drag-over')"
+        ondragleave="this.classList.remove('bullet-drag-over')"
+        ondrop="event.preventDefault();this.classList.remove('bullet-drag-over');var d=window._bDrag;if(d&&d.i!==${i})reorderTopicBullets(d.id,d.i,${i})">
+        <span class="pd-drag-handle" title="Drag to reorder">⠿</span>
+        <span class="bullet-mark" style="color:#818cf8">•</span>
+        <textarea class="bullet-textarea pd-textarea" draggable="false" data-idx="${i}" rows="1" placeholder="Type a point…" oninput="autoGrowTextarea(this); updateTopicBullet('${n.id}', ${i}, this.value)">${escapeHtml(b)}</textarea>
         <span class="pd-remove" onclick="removeTopicBullet('${n.id}', ${i})" title="Remove this point">✕</span>
       </div>`).join('');
     bulletsHtml = `<div class="bullet-list">${rows}</div>
@@ -2090,6 +2103,17 @@ function removeTopicBullet(nodeId, idx) {
   };
   if (isAdmin) { openDeleteConfirm('Delete this description point? This cannot be undone.', doRemove); return; }
   doRemove();
+}
+function reorderTopicBullets(nodeId, fromIdx, toIdx) {
+  if (fromIdx === toIdx) return;
+  const m = activeMember(); if (!m || !canEditBoard()) return;
+  const n = findNode(m, nodeId); if (!n || !canEditNode(n)) return;
+  const bullets = n.bullets || [];
+  if (fromIdx < 0 || fromIdx >= bullets.length || toIdx < 0 || toIdx >= bullets.length) return;
+  const [item] = bullets.splice(fromIdx, 1);
+  bullets.splice(toIdx, 0, item);
+  save();
+  showTopicDetail(findNode(activeMember(), nodeId));
 }
 
 function renderAll() {
