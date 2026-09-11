@@ -2027,6 +2027,29 @@ function showTopicDetail(n) {
     html += `<div class="d-section">Connected to</div>`;
     conns.forEach(c => { html += `<span class="d-conn-chip" onclick="showTopicDetail(findNode(activeMember(),'${c.id}'))">${escapeHtml(truncate(c.text, 26))}</span>`; });
   }
+  // Balloon task log
+  const balloons = n.balloons || [];
+  if (balloons.length) {
+    const PCOL = { low: '#059669', medium: '#d97706', high: '#dc2626' };
+    html += `<div class="d-section">Balloon Tasks</div>`;
+    html += `<div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">`;
+    balloons.forEach(b => {
+      const addedStr = b.addedAt ? formatTimestamp(b.addedAt) : 'unknown';
+      const doneStr  = b.done && b.doneAt ? formatTimestamp(b.doneAt) : null;
+      const dot = PCOL[b.priority] || PCOL.medium;
+      const strikeStyle = b.done ? 'text-decoration:line-through;opacity:0.55;' : '';
+      html += `<div style="background:rgba(255,255,255,0.07);border-radius:7px;padding:7px 10px;font-size:11px;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${dot};flex-shrink:0;display:inline-block"></span>
+          <span style="font-weight:600;color:#e2e8f0;${strikeStyle}">${escapeHtml(b.text)}</span>
+          ${b.done ? '<span style="color:#6ee7b7;font-size:9.5px;font-weight:700;margin-left:auto">✓ Done</span>' : ''}
+        </div>
+        <div style="color:rgba(255,255,255,.4);font-size:9.5px;">Assigned: ${escapeHtml(addedStr)}</div>
+        ${doneStr ? `<div style="color:rgba(110,231,183,.6);font-size:9.5px;">Completed: ${escapeHtml(doneStr)}</div>` : ''}
+      </div>`;
+    });
+    html += `</div>`;
+  }
   if (!canEditBoard()) html += `<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:14px">👀 Read-only — this isn't your board.</div>`;
   else if (isNodeLocked(n)) html += `<div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:14px">🔒 Committed — locked from editing.</div>`;
   document.getElementById('detail-content').innerHTML = html;
@@ -3458,7 +3481,7 @@ function addBalloon(nodeId) {
   const node = findNode(m, nodeId); if (!node) return;
   if (!node.balloons) node.balloons = [];
   const id = 'bl' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-  node.balloons.push({ id, text: 'New task', priority: 'medium', done: false });
+  node.balloons.push({ id, text: 'New task', priority: 'medium', done: false, addedAt: Date.now() });
   save(); buildD3Map();
 }
 
@@ -3476,6 +3499,7 @@ function burstBalloon(nodeId, balloonId) {
   const node = findNode(m, nodeId); if (!node || !node.balloons) return;
   const b = node.balloons.find(x => x.id === balloonId); if (!b) return;
   b.done = true;
+  b.doneAt = Date.now();
   save(); buildD3Map();
 }
 
@@ -3620,20 +3644,22 @@ function drawBalloons(g, d) {
     }
   });
 
-  // Popped (done) balloons: small gray deflated indicators at the node's top-right
+  // Popped (done) balloons: small deflated indicators at the node's bottom-right, original color
   if (popped.length) {
     const popGroup = container.append('g').attr('class', 'done-balloons')
-      .attr('transform', `translate(${cw},${-ch / 2 - 2})`);
+      .attr('transform', `translate(${cw},${ch / 2 + 2})`);
     popped.forEach((b, i) => {
       const dx = -(i * 13);
       const col = BALLOON_COLORS[b.priority] || BALLOON_COLORS.medium;
       const pg = popGroup.append('g').attr('class', 'balloon-done')
         .attr('transform', `translate(${dx},0)`);
       pg.append('ellipse').attr('cx', 0).attr('cy', 0).attr('rx', 6).attr('ry', 7)
-        .attr('fill', '#cbd5e1').attr('stroke', '#94a3b8').attr('stroke-width', 0.8).attr('opacity', 0.75);
+        .attr('fill', col.fill).attr('stroke', col.stroke).attr('stroke-width', 0.8).attr('opacity', 0.72);
+      // Deflated flat line through the middle
       pg.append('line').attr('x1', -5).attr('y1', 0).attr('x2', 5).attr('y2', 0)
-        .attr('stroke', '#64748b').attr('stroke-width', 1.5).attr('stroke-linecap', 'round');
-      pg.append('title').text(`✓ ${b.text}  [${b.priority} priority]`);
+        .attr('stroke', col.stroke).attr('stroke-width', 1.5).attr('stroke-linecap', 'round');
+      const doneStr = b.doneAt ? ` · done ${new Date(b.doneAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}` : '';
+      pg.append('title').text(`✓ ${b.text}  [${b.priority}${doneStr}]`);
     });
   }
 
