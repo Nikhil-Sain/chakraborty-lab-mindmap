@@ -3699,7 +3699,7 @@ function drawBalloons(g, d) {
       const pg = popGroup.append('g').attr('class', 'balloon-done')
         .attr('transform', `translate(${dx},0)`);
       pg.append('ellipse').attr('cx', 0).attr('cy', 0).attr('rx', 6).attr('ry', 7)
-        .attr('fill', col.fill).attr('stroke', col.stroke).attr('stroke-width', 0.8).attr('opacity', 0.72);
+        .attr('fill', col.fill).attr('stroke', col.stroke).attr('stroke-width', 0.8);
       // Deflated flat line through the middle
       pg.append('line').attr('x1', -5).attr('y1', 0).attr('x2', 5).attr('y2', 0)
         .attr('stroke', col.stroke).attr('stroke-width', 1.5).attr('stroke-linecap', 'round');
