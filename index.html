@@ -149,7 +149,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 
 /* ── Mind map canvas ── */
 #map-wrap{position:relative;display:flex;background:#f1f5fb;border-radius:14px 14px 0 0;overflow:hidden;flex:1 1 auto;min-height:300px}
-#map-svg{flex:1;display:block;cursor:grab}
+#map-svg{flex:1;display:block;cursor:grab;overflow:visible}
 #map-svg:active{cursor:grabbing}
 #map-empty{display:none;position:absolute;inset:0;align-items:center;justify-content:center;text-align:center;color:rgba(30,41,59,.45);font-size:13px;padding:40px}
 
@@ -183,6 +183,14 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 
 .empty-state{padding:70px 20px;text-align:center;color:#9ca3af;font-size:13px}
 .inline-edit-input{width:100%;height:100%;box-sizing:border-box;background:rgba(15,23,42,.88);border:1px solid #818cf8;border-radius:4px;color:#fff;font-family:inherit;font-size:11px;padding:1px 5px;outline:none;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.balloon-edit-input{width:100%;height:100%;box-sizing:border-box;background:rgba(15,23,42,.92);border:1px solid #818cf8;border-radius:4px;color:#fff;font-family:inherit;font-size:9px;padding:3px 5px;outline:none;box-shadow:0 2px 8px rgba(0,0,0,.3);resize:none;line-height:1.35}
+.balloon-burst-btn{cursor:pointer;opacity:0.7;transition:opacity 0.12s}
+.balloon-burst-btn:hover{opacity:1}
+.balloon-add-btn{cursor:pointer;opacity:0;transition:opacity 0.15s}
+.map-node:hover .balloon-add-btn{opacity:0.85}
+.balloon-body{transition:filter 0.15s}
+.balloon-body:hover{filter:brightness(1.1)}
+.balloon-done{cursor:default}
 
 /* ── Modals ── */
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center}
@@ -2339,7 +2347,7 @@ function mapUpdate(source) {
   const m = activeMember(); if (!m) return;
 
   const range = computeWeekRange(m);
-  const minBandWidth = 220, topMargin = 48, leftMargin = 190, weekHeaderHeight = 40;
+  const minBandWidth = 220, topMargin = 110, leftMargin = 190, weekHeaderHeight = 40;
   const colInset = 16, cellPadL = 18, cellPadR = 16, colRightMargin = 14, subPadL = 10, subPadR = 9;
   // Micro Node's parallelogram slants at both the top-left and bottom-right corners (skew,
   // capped at 13px) — its padding needs to clear that lean on both sides, not just the
@@ -2861,6 +2869,7 @@ function mapUpdate(source) {
     const committed = nodeIsCommitted(n);
     g.select('.drag-handle-face-bg').attr('fill', committed ? '#facc15' : '#ef4444');
     g.select('.drag-handle-face title').text(committed ? 'Committed — locked in' : 'Not yet committed — awaiting admin review');
+    drawBalloons(g, d);
   });
   node.exit().transition().duration(duration).style('opacity', 0)
     .attr('transform', () => `translate(${source.y},${source.x})`).remove();
@@ -3436,6 +3445,212 @@ function editNodeName(event, d, gSel) {
   });
 }
 
+// ── BALLOON TASKS ────────────────────────────────────────────────────────────
+const BALLOON_COLORS = {
+  low:    { fill: '#6ee7b7', stroke: '#059669', text: '#064e3b', knot: '#059669' },
+  medium: { fill: '#fcd34d', stroke: '#d97706', text: '#78350f', knot: '#d97706' },
+  high:   { fill: '#fca5a5', stroke: '#dc2626', text: '#7f1d1d', knot: '#dc2626' }
+};
+const BALLOON_PRIORITY_ORDER = ['low', 'medium', 'high'];
+
+function addBalloon(nodeId) {
+  const m = activeMember(); if (!m || !canEditBoard()) return;
+  const node = findNode(m, nodeId); if (!node) return;
+  if (!node.balloons) node.balloons = [];
+  const id = 'bl' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  node.balloons.push({ id, text: 'New task', priority: 'medium', done: false });
+  save(); buildD3Map();
+}
+
+function cycleBalloonPriority(nodeId, balloonId) {
+  const m = activeMember(); if (!m || !canEditBoard()) return;
+  const node = findNode(m, nodeId); if (!node || !node.balloons) return;
+  const b = node.balloons.find(x => x.id === balloonId); if (!b || b.done) return;
+  const idx = BALLOON_PRIORITY_ORDER.indexOf(b.priority);
+  b.priority = BALLOON_PRIORITY_ORDER[(idx + 1) % 3];
+  save(); buildD3Map();
+}
+
+function burstBalloon(nodeId, balloonId) {
+  const m = activeMember(); if (!m || !canEditBoard()) return;
+  const node = findNode(m, nodeId); if (!node || !node.balloons) return;
+  const b = node.balloons.find(x => x.id === balloonId); if (!b) return;
+  b.done = true;
+  save(); buildD3Map();
+}
+
+function editBalloonText(nodeId, balloonId, gSel, bx, bodyY) {
+  const m = activeMember(); if (!m || !canEditBoard()) return;
+  const node = findNode(m, nodeId); if (!node || !node.balloons) return;
+  const b = node.balloons.find(x => x.id === balloonId); if (!b || b.done) return;
+  // gSel may be stale if the map rebuilt; find the live group element
+  const liveG = d3.selectAll('.map-node').filter(function(d) {
+    return d.data && d.data.nodeRef && d.data.nodeRef.id === nodeId;
+  });
+  const targetG = liveG.empty() ? gSel : liveG;
+  d3.selectAll('.inline-edit-fo').remove();
+  const foW = 58, foH = 52;
+  const fo = targetG.append('foreignObject').attr('class', 'inline-edit-fo')
+    .attr('x', bx - foW / 2).attr('y', bodyY - foH / 2)
+    .attr('width', foW).attr('height', foH);
+  const ta = fo.append('xhtml:textarea').attr('class', 'balloon-edit-input')
+    .property('value', b.text)
+    .on('mousedown', e => e.stopPropagation())
+    .on('click', e => e.stopPropagation());
+  const taNode = ta.node();
+  taNode.focus(); taNode.select();
+  let done = false;
+  function commit() {
+    if (done) return; done = true;
+    const v = taNode.value.trim() || b.text;
+    fo.remove();
+    const freshNode = findNode(activeMember(), nodeId);
+    if (freshNode && freshNode.balloons) {
+      const fb = freshNode.balloons.find(x => x.id === balloonId);
+      if (fb && v !== fb.text) { fb.text = v; save(); }
+    }
+    buildD3Map();
+  }
+  function cancel() { if (done) return; done = true; fo.remove(); buildD3Map(); }
+  ta.on('blur', commit);
+  ta.on('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commit(); }
+  });
+}
+
+function drawBalloons(g, d) {
+  g.selectAll('.balloon-container').remove();
+  const n = d.data.nodeRef; if (!n) return;
+  const balloons = n.balloons || []; if (!balloons.length && !canEditBoard()) return;
+  const cw = d.cellWidth, ch = d.cellHeight;
+  const canEdit = canEditBoard();
+  const container = g.append('g').attr('class', 'balloon-container');
+
+  const BRX = 22, BRY = 27;   // balloon ellipse half-width/height
+  const STRING_LEN = 48;
+  const SPACING = 56;
+  const topY = -ch / 2;
+  const knotY = topY - STRING_LEN;
+  const bodyY = knotY - BRY - 2;
+
+  const active = balloons.filter(b => !b.done);
+  const popped = balloons.filter(b => b.done);
+
+  // Active balloons spread horizontally around the node's horizontal center
+  const totalW = Math.max(0, active.length - 1) * SPACING;
+  const startX = cw / 2 - totalW / 2;
+
+  active.forEach((b, i) => {
+    const bx = startX + i * SPACING;
+    const col = BALLOON_COLORS[b.priority] || BALLOON_COLORS.medium;
+    const bg = container.append('g').attr('class', 'balloon-group');
+
+    // String: gentle S-curve from node top to knot
+    const midY = topY - STRING_LEN * 0.45;
+    bg.append('path').attr('d', `M${bx},${topY} C${bx + 4},${midY} ${bx - 4},${midY + STRING_LEN * 0.4} ${bx},${knotY}`)
+      .attr('stroke', col.stroke).attr('stroke-width', 1.2).attr('fill', 'none').attr('opacity', 0.65)
+      .style('pointer-events', 'none');
+
+    // Knot
+    bg.append('circle').attr('cx', bx).attr('cy', knotY).attr('r', 2.5).attr('fill', col.knot)
+      .style('pointer-events', 'none');
+
+    // Balloon body — pointer-events:none so the textG group above handles all clicks
+    bg.append('ellipse').attr('class', 'balloon-body')
+      .attr('cx', bx).attr('cy', bodyY).attr('rx', BRX).attr('ry', BRY)
+      .attr('fill', col.fill).attr('stroke', col.stroke).attr('stroke-width', 1.3)
+      .style('pointer-events', 'none');
+
+    // Shine highlight
+    bg.append('ellipse').attr('cx', bx - 7).attr('cy', bodyY - 9).attr('rx', 7).attr('ry', 8)
+      .attr('fill', 'white').attr('opacity', 0.28).style('pointer-events', 'none');
+
+    // Text group — covers full ellipse area; click = edit text
+    const words = String(b.text || '').split(/\s+/).filter(Boolean);
+    const lines = []; let cur = '';
+    words.forEach(w => {
+      const t = cur ? cur + ' ' + w : w;
+      if (t.length <= 11) { cur = t; } else { if (cur) lines.push(cur); cur = w.slice(0, 12); }
+    });
+    if (cur) lines.push(cur);
+    if (!lines.length) lines.push('...');
+    const lineH = 9.5;
+    const textStartY = bodyY - ((lines.length - 1) * lineH) / 2;
+    const textG = bg.append('g').attr('class', 'balloon-text-group')
+      .style('cursor', canEdit ? 'text' : 'default')
+      .on('mousedown', event => event.stopPropagation())
+      .on('click', event => { event.stopPropagation(); if (canEdit) editBalloonText(n.id, b.id, g, bx, bodyY); });
+    // Hit rect covers full ellipse bounds
+    textG.append('rect').attr('x', bx - BRX).attr('y', bodyY - BRY)
+      .attr('width', BRX * 2).attr('height', BRY * 2 - 10)
+      .attr('fill', 'transparent').attr('pointer-events', 'all');
+    if (canEdit) textG.append('title').text('Click to edit task text');
+    lines.forEach((line, li) => {
+      textG.append('text').attr('x', bx).attr('y', textStartY + li * lineH)
+        .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
+        .attr('font-size', 8.5).attr('font-weight', '600').attr('fill', col.text)
+        .style('pointer-events', 'none').style('user-select', 'none').text(line);
+    });
+
+    // Priority dots — click to cycle priority (low → medium → high)
+    const dotsG = bg.append('g').attr('class', 'balloon-priority-dots')
+      .style('cursor', canEdit ? 'pointer' : 'default')
+      .on('mousedown', event => event.stopPropagation())
+      .on('click', event => { event.stopPropagation(); if (canEdit) cycleBalloonPriority(n.id, b.id); });
+    dotsG.append('rect').attr('x', bx - 10).attr('y', bodyY + BRY - 14)
+      .attr('width', 20).attr('height', 12)
+      .attr('fill', 'transparent').attr('pointer-events', 'all');
+    dotsG.append('text').attr('x', bx).attr('y', bodyY + BRY - 6)
+      .attr('text-anchor', 'middle').attr('font-size', 6.5).attr('fill', col.stroke)
+      .style('pointer-events', 'none').style('user-select', 'none')
+      .text(b.priority === 'high' ? '●●●' : b.priority === 'medium' ? '●●○' : '●○○');
+    if (canEdit) dotsG.append('title').text('Click to cycle priority: low → medium → high');
+
+    // Burst (×) button at top-right of balloon
+    if (canEdit) {
+      const bBtn = bg.append('g').attr('class', 'balloon-burst-btn')
+        .attr('transform', `translate(${bx + BRX - 5},${bodyY - BRY + 5})`)
+        .on('mousedown', event => event.stopPropagation())
+        .on('click', event => { event.stopPropagation(); burstBalloon(n.id, b.id); });
+      bBtn.append('circle').attr('r', 7).attr('fill', 'white').attr('opacity', 0.72);
+      bBtn.append('text').attr('text-anchor', 'middle').attr('dy', '0.35em')
+        .attr('font-size', 10).attr('fill', '#7f1d1d').style('user-select', 'none').text('×');
+      bBtn.append('title').text('Mark done — task text is saved for reference');
+    }
+  });
+
+  // Popped (done) balloons: small gray deflated indicators at the node's top-right
+  if (popped.length) {
+    const popGroup = container.append('g').attr('class', 'done-balloons')
+      .attr('transform', `translate(${cw},${-ch / 2 - 2})`);
+    popped.forEach((b, i) => {
+      const dx = -(i * 13);
+      const col = BALLOON_COLORS[b.priority] || BALLOON_COLORS.medium;
+      const pg = popGroup.append('g').attr('class', 'balloon-done')
+        .attr('transform', `translate(${dx},0)`);
+      pg.append('ellipse').attr('cx', 0).attr('cy', 0).attr('rx', 6).attr('ry', 7)
+        .attr('fill', '#cbd5e1').attr('stroke', '#94a3b8').attr('stroke-width', 0.8).attr('opacity', 0.75);
+      pg.append('line').attr('x1', -5).attr('y1', 0).attr('x2', 5).attr('y2', 0)
+        .attr('stroke', '#64748b').attr('stroke-width', 1.5).attr('stroke-linecap', 'round');
+      pg.append('title').text(`✓ ${b.text}  [${b.priority} priority]`);
+    });
+  }
+
+  // "+" add button: visible on node hover
+  if (canEdit) {
+    const addX = active.length ? startX + active.length * SPACING : cw / 2;
+    const addBtn = container.append('g').attr('class', 'balloon-add-btn')
+      .attr('transform', `translate(${cw / 2},${-ch / 2 - 16})`)
+      .on('mousedown', event => event.stopPropagation())
+      .on('click', event => { event.stopPropagation(); addBalloon(n.id); });
+    addBtn.append('circle').attr('r', 9).attr('fill', '#e0e7ff').attr('stroke', '#6366f1').attr('stroke-width', 1.2);
+    addBtn.append('text').attr('text-anchor', 'middle').attr('dy', '0.35em')
+      .attr('font-size', 13).attr('fill', '#4338ca').style('user-select', 'none').text('+');
+    addBtn.append('title').text('Add a balloon task to this node');
+  }
+}
+
 function isAnchor(d, m) {
   if (d.data.type === 'root') return !m.lastTopicId && m.lastProjectId === d.data.projectId;
   return !!d.data.nodeRef && d.data.nodeRef.id === m.lastTopicId;
@@ -3457,7 +3672,7 @@ function onNodeClick(d) {
 }
 function resetMapView() {
   if (!mapSvgSel || !mapZoom) return;
-  mapSvgSel.transition().duration(500).call(mapZoom.transform, d3.zoomIdentity.translate(16, 10).scale(0.9));
+  mapSvgSel.transition().duration(500).call(mapZoom.transform, d3.zoomIdentity.translate(16, 40).scale(0.9));
 }
 window.addEventListener('resize', () => buildD3Map());
 
