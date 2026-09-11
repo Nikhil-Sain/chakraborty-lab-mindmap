@@ -2031,21 +2031,25 @@ function showTopicDetail(n) {
   const balloons = n.balloons || [];
   if (balloons.length) {
     const PCOL = { low: '#059669', medium: '#d97706', high: '#dc2626' };
+    const canDeleteBalloon = isAdmin || (!isNodeLocked(n) && canEditBoard());
     html += `<div class="d-section">Balloon Tasks</div>`;
     html += `<div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">`;
     balloons.forEach(b => {
       const addedStr = b.addedAt ? formatTimestamp(b.addedAt) : 'unknown';
       const doneStr  = b.done && b.doneAt ? formatTimestamp(b.doneAt) : null;
       const dot = PCOL[b.priority] || PCOL.medium;
-      const strikeStyle = b.done ? 'text-decoration:line-through;opacity:0.55;' : '';
+      const delBtn = canDeleteBalloon
+        ? `<span class="pd-remove" onclick="removeBalloon('${n.id}','${b.id}')" title="Remove task" style="margin-left:auto;padding:0 0 0 6px">✕</span>`
+        : '';
       html += `<div style="background:rgba(255,255,255,0.07);border-radius:7px;padding:7px 10px;font-size:11px;">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
           <span style="width:8px;height:8px;border-radius:50%;background:${dot};flex-shrink:0;display:inline-block"></span>
-          <span style="font-weight:600;color:#e2e8f0;${strikeStyle}">${escapeHtml(b.text)}</span>
+          <span style="font-weight:600;color:#e2e8f0;">${escapeHtml(b.text)}</span>
           ${b.done ? '<span style="color:#6ee7b7;font-size:9.5px;font-weight:700;margin-left:auto">✓ Done</span>' : ''}
+          ${delBtn}
         </div>
         <div style="color:rgba(255,255,255,.4);font-size:9.5px;">Assigned: ${escapeHtml(addedStr)}</div>
-        ${doneStr ? `<div style="color:rgba(110,231,183,.6);font-size:9.5px;">Completed: ${escapeHtml(doneStr)}</div>` : ''}
+        ${doneStr ? `<div style="color:rgba(110,231,183,.7);font-size:9.5px;">Completed: ${escapeHtml(doneStr)}</div>` : ''}
       </div>`;
     });
     html += `</div>`;
@@ -3501,6 +3505,22 @@ function burstBalloon(nodeId, balloonId) {
   b.done = true;
   b.doneAt = Date.now();
   save(); buildD3Map();
+}
+
+function removeBalloon(nodeId, balloonId) {
+  const m = activeMember(); if (!m || !canEditBoard()) return;
+  const node = findNode(m, nodeId); if (!node || !node.balloons) return;
+  if (!isAdmin && isNodeLocked(node)) return;
+  const doRemove = () => {
+    const curM = activeMember(); if (!curM || !canEditBoard()) return;
+    const curNode = findNode(curM, nodeId); if (!curNode || !curNode.balloons) return;
+    curNode.balloons = curNode.balloons.filter(x => x.id !== balloonId);
+    save();
+    showTopicDetail(findNode(activeMember(), nodeId));
+    buildD3Map();
+  };
+  if (isAdmin) { openDeleteConfirm('Remove this balloon task? This cannot be undone.', doRemove); return; }
+  doRemove();
 }
 
 function editBalloonText(nodeId, balloonId, gSel, bx, bodyY) {
