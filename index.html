@@ -3674,7 +3674,7 @@ function editBalloonText(nodeId, balloonId, gSel, bx, bodyY) {
   });
   const targetG = liveG.empty() ? gSel : liveG;
   d3.selectAll('.inline-edit-fo').remove();
-  const foW = 58, foH = 52;
+  const foW = 60, foH = 56;
   const fo = targetG.append('foreignObject').attr('class', 'inline-edit-fo')
     .attr('x', bx - foW / 2).attr('y', bodyY - foH / 2)
     .attr('width', foW).attr('height', foH);
@@ -3720,65 +3720,90 @@ function drawBalloons(g, d) {
   const canEdit = canEditBoard();
   const container = g.append('g').attr('class', 'balloon-container');
 
-  const BRX = 22, BRY = 27;   // balloon ellipse half-width/height
-  const STRING_LEN = 48;
-  const SPACING = 56;
+  const BRX = 28, BRY = 32;    // bigger ellipse: 56px wide, 64px tall
+  const STRING_LEN = 54;        // node-top → knot
+  const STEM_LEN = 22;          // shared vertical stem before branching (multi-balloon)
+  const SPACING = 68;           // horizontal gap between balloon centers
+  const CHAR_LIMIT = 13;        // chars per wrap line (wider balloon)
   const topY = -ch / 2;
+  const stemX = cw / 2;         // shared origin on node top
   const knotY = topY - STRING_LEN;
-  const bodyY = knotY - BRY - 2;
+  const bodyY = knotY - BRY - 3;
+  const stemTopY = topY - STEM_LEN; // gathering point where strings branch
 
   const active = balloons.filter(b => !b.done);
   const popped = balloons.filter(b => b.done);
 
-  // Active balloons spread horizontally around the node's horizontal center
   const totalW = Math.max(0, active.length - 1) * SPACING;
-  const startX = cw / 2 - totalW / 2;
+  const startX = stemX - totalW / 2;
+
+  // ── Shared stem + bundle knot (only when >1 balloon) ─────────────────────
+  if (active.length > 1) {
+    container.append('path')
+      .attr('d', `M${stemX},${topY} L${stemX},${stemTopY}`)
+      .attr('stroke', '#9ca3af').attr('stroke-width', 1.8).attr('fill', 'none')
+      .style('pointer-events', 'none');
+    container.append('circle')
+      .attr('cx', stemX).attr('cy', stemTopY).attr('r', 3.5)
+      .attr('fill', '#6b7280').style('pointer-events', 'none');
+  }
 
   active.forEach((b, i) => {
     const bx = startX + i * SPACING;
     const col = BALLOON_COLORS[b.priority] || BALLOON_COLORS.medium;
     const bg = container.append('g').attr('class', 'balloon-group');
 
-    // String: gentle S-curve from node top to knot
-    const midY = topY - STRING_LEN * 0.45;
-    bg.append('path').attr('d', `M${bx},${topY} C${bx + 4},${midY} ${bx - 4},${midY + STRING_LEN * 0.4} ${bx},${knotY}`)
-      .attr('stroke', col.stroke).attr('stroke-width', 1.2).attr('fill', 'none').attr('opacity', 0.65)
-      .style('pointer-events', 'none');
+    if (active.length === 1) {
+      // Single balloon: S-curve from node centre-top to knot
+      const midY = topY - STRING_LEN * 0.45;
+      bg.append('path')
+        .attr('d', `M${stemX},${topY} C${stemX+4},${midY} ${bx-4},${midY+STRING_LEN*0.4} ${bx},${knotY}`)
+        .attr('stroke', col.stroke).attr('stroke-width', 1.2).attr('fill', 'none').attr('opacity', 0.65)
+        .style('pointer-events', 'none');
+    } else {
+      // Multi-balloon: branch from the shared gathering point
+      bg.append('path')
+        .attr('d', `M${stemX},${stemTopY} C${stemX},${stemTopY-10} ${bx},${knotY+14} ${bx},${knotY}`)
+        .attr('stroke', col.stroke).attr('stroke-width', 1.2).attr('fill', 'none').attr('opacity', 0.65)
+        .style('pointer-events', 'none');
+    }
 
-    // Knot
+    // Individual knot at the balloon end
     bg.append('circle').attr('cx', bx).attr('cy', knotY).attr('r', 2.5).attr('fill', col.knot)
       .style('pointer-events', 'none');
 
-    // Balloon body — pointer-events:none so the textG group above handles all clicks
+    // Balloon body
     bg.append('ellipse').attr('class', 'balloon-body')
       .attr('cx', bx).attr('cy', bodyY).attr('rx', BRX).attr('ry', BRY)
       .attr('fill', col.fill).attr('stroke', col.stroke).attr('stroke-width', 1.3)
       .style('pointer-events', 'none');
 
     // Shine highlight
-    bg.append('ellipse').attr('cx', bx - 7).attr('cy', bodyY - 9).attr('rx', 7).attr('ry', 8)
+    bg.append('ellipse').attr('cx', bx - 9).attr('cy', bodyY - 10).attr('rx', 8).attr('ry', 9)
       .attr('fill', 'white').attr('opacity', 0.28).style('pointer-events', 'none');
 
-    // Text group — covers full ellipse area; click = edit text
+    // Text — wrapped at CHAR_LIMIT, centred in the upper portion of the ellipse
     const words = String(b.text || '').split(/\s+/).filter(Boolean);
     const lines = []; let cur = '';
     words.forEach(w => {
       const t = cur ? cur + ' ' + w : w;
-      if (t.length <= 11) { cur = t; } else { if (cur) lines.push(cur); cur = w.slice(0, 12); }
+      if (t.length <= CHAR_LIMIT) { cur = t; } else { if (cur) lines.push(cur); cur = w.slice(0, CHAR_LIMIT + 1); }
     });
     if (cur) lines.push(cur);
     if (!lines.length) lines.push('...');
     const lineH = 9.5;
-    const textStartY = bodyY - ((lines.length - 1) * lineH) / 2;
+    // Shift text centre upward to leave the bottom zone clear for priority dots
+    const textCenterY = bodyY - 7;
+    const textStartY = textCenterY - ((lines.length - 1) * lineH) / 2;
+
     const textG = bg.append('g').attr('class', 'balloon-text-group')
       .style('cursor', canEdit ? 'text' : 'default')
       .on('mousedown', event => event.stopPropagation())
       .on('click', event => { event.stopPropagation(); if (canEdit) editBalloonText(n.id, b.id, g, bx, bodyY); });
-    // Hit rect covers full ellipse bounds
-    textG.append('rect').attr('x', bx - BRX).attr('y', bodyY - BRY)
-      .attr('width', BRX * 2).attr('height', BRY * 2 - 10)
+    textG.append('rect').attr('x', bx - BRX + 2).attr('y', bodyY - BRY + 12)
+      .attr('width', (BRX - 2) * 2).attr('height', BRY * 2 - 24)
       .attr('fill', 'transparent').attr('pointer-events', 'all');
-    if (canEdit) textG.append('title').text('Click to edit task text');
+    if (canEdit) textG.append('title').text('Click to edit task text (max 5 words)');
     lines.forEach((line, li) => {
       textG.append('text').attr('x', bx).attr('y', textStartY + li * lineH)
         .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
@@ -3786,24 +3811,24 @@ function drawBalloons(g, d) {
         .style('pointer-events', 'none').style('user-select', 'none').text(line);
     });
 
-    // Priority dots — click to cycle priority (low → medium → high)
+    // Priority dots — sit in the dedicated bottom zone, clear of the text
     const dotsG = bg.append('g').attr('class', 'balloon-priority-dots')
       .style('cursor', canEdit ? 'pointer' : 'default')
       .on('mousedown', event => event.stopPropagation())
       .on('click', event => { event.stopPropagation(); if (canEdit) cycleBalloonPriority(n.id, b.id); });
-    dotsG.append('rect').attr('x', bx - 10).attr('y', bodyY + BRY - 14)
-      .attr('width', 20).attr('height', 12)
+    dotsG.append('rect').attr('x', bx - 13).attr('y', bodyY + BRY - 16)
+      .attr('width', 26).attr('height', 14)
       .attr('fill', 'transparent').attr('pointer-events', 'all');
-    dotsG.append('text').attr('x', bx).attr('y', bodyY + BRY - 6)
-      .attr('text-anchor', 'middle').attr('font-size', 6.5).attr('fill', col.stroke)
+    dotsG.append('text').attr('x', bx).attr('y', bodyY + BRY - 7)
+      .attr('text-anchor', 'middle').attr('font-size', 7).attr('fill', col.stroke)
       .style('pointer-events', 'none').style('user-select', 'none')
       .text(b.priority === 'high' ? '●●●' : b.priority === 'medium' ? '●●○' : '●○○');
     if (canEdit) dotsG.append('title').text('Click to cycle priority: low → medium → high');
 
-    // Burst (×) button at top-right of balloon
+    // ×  button at top-right of balloon
     if (canEdit) {
       const bBtn = bg.append('g').attr('class', 'balloon-burst-btn')
-        .attr('transform', `translate(${bx + BRX - 5},${bodyY - BRY + 5})`)
+        .attr('transform', `translate(${bx + BRX - 6},${bodyY - BRY + 7})`)
         .on('mousedown', event => event.stopPropagation())
         .on('click', event => { event.stopPropagation(); openBalloonPopDialog(n.id, b.id); });
       bBtn.append('circle').attr('r', 7).attr('fill', 'white').attr('opacity', 0.72);
