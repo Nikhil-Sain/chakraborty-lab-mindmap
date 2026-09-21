@@ -405,6 +405,31 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
   </div>
 </div>
 
+<!-- ── BALLOON POP DIALOG ── -->
+<div class="overlay" id="ov-balloon-pop">
+  <div class="modal" style="width:310px">
+    <h3>🎈 Pop This Balloon?</h3>
+    <div id="bp-label" style="font-size:12px;color:#374151;margin-bottom:14px;word-break:break-word;line-height:1.5"></div>
+    <div style="display:flex;flex-direction:column;gap:7px">
+      <button class="btn btn-save" style="background:#10b981;text-align:left;padding:10px 14px;border-radius:9px;line-height:1.3" onclick="balloonPopConvert('node')">
+        <div style="font-size:12px;font-weight:800">● Convert to Node</div>
+        <div style="font-size:10px;font-weight:400;opacity:0.9;margin-top:2px">Creates a new top-level node in this project</div>
+      </button>
+      <button class="btn btn-save" style="background:#6366f1;text-align:left;padding:10px 14px;border-radius:9px;line-height:1.3" onclick="balloonPopConvert('sub')">
+        <div style="font-size:12px;font-weight:800">■ Convert to Sub Node</div>
+        <div style="font-size:10px;font-weight:400;opacity:0.9;margin-top:2px">Creates a child under the current node</div>
+      </button>
+      <button class="btn" style="background:#fef3c7;color:#92400e;text-align:left;padding:10px 14px;border-radius:9px;line-height:1.3" onclick="balloonPopConvert('pop')">
+        <div style="font-size:12px;font-weight:800">× Just Pop It</div>
+        <div style="font-size:10px;font-weight:400;opacity:0.8;margin-top:2px">Mark done — keeps a deflated record on the node</div>
+      </button>
+    </div>
+    <div class="modal-footer" style="margin-top:12px">
+      <button class="btn btn-dismiss" onclick="closeBalloonPopDialog()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── ADMIN DELETE CONFIRMATION: re-enter your password before any admin deletion ── -->
 <div class="overlay" id="ov-delete-confirm">
   <div class="modal">
@@ -1297,6 +1322,7 @@ function migrateData() {
       delete n.desc;
       delete n.media;
       if (!n.kind) n.kind = 'sub';
+      (n.balloons || []).forEach(b => { if (!b.points) b.points = []; });
       backfill(n.children || []);
     });
   }
@@ -1751,6 +1777,7 @@ document.getElementById('ov-connect').addEventListener('click', e => { if (e.tar
 document.getElementById('ov-import-confirm').addEventListener('click', e => { if (e.target.id === 'ov-import-confirm') closeImportConfirm(); });
 document.getElementById('ic-password').addEventListener('keydown', e => { if (e.key === 'Enter') confirmImportWithPassword(); });
 document.getElementById('ov-delete-confirm').addEventListener('click', e => { if (e.target.id === 'ov-delete-confirm') closeDeleteConfirm(); });
+document.getElementById('ov-balloon-pop').addEventListener('click', e => { if (e.target.id === 'ov-balloon-pop') closeBalloonPopDialog(); });
 document.getElementById('dc-password').addEventListener('keydown', e => { if (e.key === 'Enter') confirmDeleteWithPassword(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeNodeModal(); closeConnectModal(); closeImportConfirm(); closeDeleteConfirm(); } });
 
@@ -2055,6 +2082,21 @@ function showTopicDetail(n) {
       const delBtn = canDeleteBalloon
         ? `<span class="pd-remove" onclick="removeBalloon('${n.id}','${b.id}')" title="Remove task" style="margin-left:auto;padding:0 0 0 6px">✕</span>`
         : '';
+      const pts = b.points || [];
+      const canEditPts = canDeleteBalloon && !b.done;
+      const ptsHtml = pts.map((pt, idx) => `
+        <div style="display:flex;align-items:flex-start;gap:4px;margin-top:3px;">
+          <span style="color:#818cf8;font-size:10px;line-height:18px;flex-shrink:0">•</span>
+          ${canEditPts
+            ? `<textarea class="pd-textarea bp-textarea" rows="1" style="flex:1;font-size:10px;color:#374151;background:transparent;border:none;border-bottom:1px solid #e2e8f0;border-radius:0;padding:1px 2px;resize:none;font-family:inherit;outline:none"
+                oninput="autoGrowTextarea(this);updateBalloonPoint('${n.id}','${b.id}',${idx},this.value)">${escapeHtml(pt)}</textarea>
+               <span class="pd-remove" onclick="removeBalloonPoint('${n.id}','${b.id}',${idx})" style="font-size:9px;padding:2px 0 0 4px;line-height:18px;flex-shrink:0">✕</span>`
+            : `<span style="font-size:10px;color:#374151;line-height:1.5">${escapeHtml(pt)}</span>`
+          }
+        </div>`).join('');
+      const addPtBtn = canEditPts
+        ? `<button onclick="addBalloonPoint('${n.id}','${b.id}')" style="margin-top:5px;background:none;border:none;color:#818cf8;font-size:10px;font-weight:700;cursor:pointer;padding:0;font-family:inherit">+ Add note</button>`
+        : '';
       html += `<div style="background:rgba(0,0,0,0.04);border-radius:7px;padding:8px 10px;font-size:11px;border:1px solid rgba(0,0,0,0.06);">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
           <span style="width:9px;height:9px;border-radius:50%;background:${dot};flex-shrink:0;display:inline-block"></span>
@@ -2064,6 +2106,7 @@ function showTopicDetail(n) {
         </div>
         <div style="color:#64748b;font-size:10px;">📅 Created: ${escapeHtml(addedStr)}</div>
         ${doneStr ? `<div style="color:#059669;font-size:10px;margin-top:2px;">✓ Completed: ${escapeHtml(doneStr)}</div>` : ''}
+        ${ptsHtml}${addPtBtn}
       </div>`;
     });
     html += `</div>`;
@@ -3510,7 +3553,7 @@ function addBalloon(nodeId) {
   const node = findNode(m, nodeId); if (!node) return;
   if (!node.balloons) node.balloons = [];
   const id = 'bl' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-  node.balloons.push({ id, text: 'New task', priority: 'medium', done: false, addedAt: Date.now() });
+  node.balloons.push({ id, text: 'New task', priority: 'medium', done: false, addedAt: Date.now(), points: [] });
   save(); buildD3Map();
 }
 
@@ -3548,6 +3591,75 @@ function removeBalloon(nodeId, balloonId) {
   doRemove();
 }
 
+function addBalloonPoint(nodeId, balloonId) {
+  const m = activeMember(); if (!m || !canEditBoard()) return;
+  const n = findNode(m, nodeId); if (!n) return;
+  const b = (n.balloons || []).find(x => x.id === balloonId); if (!b || b.done) return;
+  if (!b.points) b.points = [];
+  b.points.push('');
+  save();
+  showTopicDetail(findNode(activeMember(), nodeId));
+  setTimeout(() => {
+    const areas = document.querySelectorAll('#detail-content .bp-textarea');
+    const last = areas[areas.length - 1]; if (last) { last.focus(); autoGrowTextarea(last); }
+  }, 30);
+}
+function updateBalloonPoint(nodeId, balloonId, idx, value) {
+  const m = activeMember(); if (!m || !canEditBoard()) return;
+  const n = findNode(m, nodeId); if (!n) return;
+  const b = (n.balloons || []).find(x => x.id === balloonId); if (!b || !b.points) return;
+  b.points[idx] = value; save();
+}
+function removeBalloonPoint(nodeId, balloonId, idx) {
+  const m = activeMember(); if (!m || !canEditBoard()) return;
+  const n = findNode(m, nodeId); if (!n) return;
+  const b = (n.balloons || []).find(x => x.id === balloonId); if (!b || !b.points) return;
+  b.points.splice(idx, 1); save();
+  showTopicDetail(findNode(activeMember(), nodeId));
+}
+
+let _balloonPopData = null;
+function openBalloonPopDialog(nodeId, balloonId) {
+  const m = activeMember(); if (!m) return;
+  const n = findNode(m, nodeId); if (!n) return;
+  const b = (n.balloons || []).find(x => x.id === balloonId); if (!b) return;
+  _balloonPopData = { nodeId, balloonId };
+  document.getElementById('bp-label').textContent = `"${b.text}" — what would you like to do?`;
+  document.getElementById('ov-balloon-pop').classList.add('open');
+}
+function closeBalloonPopDialog() {
+  _balloonPopData = null;
+  document.getElementById('ov-balloon-pop').classList.remove('open');
+}
+function balloonPopConvert(action) {
+  if (!_balloonPopData) return;
+  const { nodeId, balloonId } = _balloonPopData;
+  closeBalloonPopDialog();
+  const m = activeMember(); if (!m || !canEditBoard()) return;
+  const n = findNode(m, nodeId); if (!n) return;
+  const b = (n.balloons || []).find(x => x.id === balloonId); if (!b) return;
+  if (action === 'pop') { burstBalloon(nodeId, balloonId); return; }
+  const newTopic = {
+    id: genId(), text: b.text, date: todayStr(),
+    kind: action === 'node' ? 'node' : 'sub',
+    bullets: (b.points && b.points.filter(p => p.trim())) || [],
+    createdAt: Date.now(), children: []
+  };
+  if (action === 'node') {
+    const proj = m.projects.find(p => p.id === n.projectId) || m.projects[0];
+    if (!proj) return;
+    newTopic.projectId = proj.id;
+    m.topics.push(newTopic);
+  } else {
+    n.children = n.children || [];
+    n.children.push(newTopic);
+  }
+  n.balloons = (n.balloons || []).filter(x => x.id !== balloonId);
+  m.lastTopicId = newTopic.id;
+  save(); buildD3Map();
+  setTimeout(() => { const fn = findNode(activeMember(), newTopic.id); if (fn) showTopicDetail(fn); }, 120);
+}
+
 function editBalloonText(nodeId, balloonId, gSel, bx, bodyY) {
   const m = activeMember(); if (!m || !canEditBoard()) return;
   const node = findNode(m, nodeId); if (!node || !node.balloons) return;
@@ -3571,7 +3683,8 @@ function editBalloonText(nodeId, balloonId, gSel, bx, bodyY) {
   let done = false;
   function commit() {
     if (done) return; done = true;
-    const v = taNode.value.trim() || b.text;
+    const raw = taNode.value.trim();
+    const v = (raw ? raw.split(/\s+/).slice(0, 5).join(' ') : '') || b.text;
     fo.remove();
     const freshNode = findNode(activeMember(), nodeId);
     if (freshNode && freshNode.balloons) {
@@ -3681,11 +3794,11 @@ function drawBalloons(g, d) {
       const bBtn = bg.append('g').attr('class', 'balloon-burst-btn')
         .attr('transform', `translate(${bx + BRX - 5},${bodyY - BRY + 5})`)
         .on('mousedown', event => event.stopPropagation())
-        .on('click', event => { event.stopPropagation(); burstBalloon(n.id, b.id); });
+        .on('click', event => { event.stopPropagation(); openBalloonPopDialog(n.id, b.id); });
       bBtn.append('circle').attr('r', 7).attr('fill', 'white').attr('opacity', 0.72);
       bBtn.append('text').attr('text-anchor', 'middle').attr('dy', '0.35em')
         .attr('font-size', 10).attr('fill', '#7f1d1d').style('user-select', 'none').text('×');
-      bBtn.append('title').text('Mark done — task text is saved for reference');
+      bBtn.append('title').text('Pop balloon — convert to node, subnode, or mark done');
     }
   });
 
