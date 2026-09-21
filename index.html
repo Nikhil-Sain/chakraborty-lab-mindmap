@@ -2907,7 +2907,6 @@ function mapUpdate(source) {
   tE.append('circle').attr('class', 'has-content-dot').attr('r', 3.5).attr('fill', '#4f46e5').attr('stroke', '#fff').attr('stroke-width', 1).style('display', 'none');
   // Review status, always shown (even to admin, who bypasses the actual edit-lock) — red
   // while it's new since the last commit, yellow once it's been committed and locked in. A
-  tE.append('text').attr('class', 'lock-badge').attr('font-size', 11).style('pointer-events', 'none').style('display', 'none').text('🔒');
   tE.append('text').attr('class', 'balloon-origin-badge').attr('font-size', 9).attr('text-anchor', 'start').style('pointer-events', 'none').style('user-select', 'none').style('display', 'none').text('🎈');
   tE.append('foreignObject').attr('class', 'desc-card').attr('width', 220).attr('height', 1000).attr('y', -20).style('display', 'none')
     .on('mouseenter', () => cancelHideHoverCard())
@@ -2964,8 +2963,6 @@ function mapUpdate(source) {
     // editing (text/date/kind/bullets/delete) is frozen, so the lock badge alone marks it.
     g.select('.editable-label').style('cursor', canEditNode(n) ? 'text' : 'default');
     g.select('.drag-handle').style('display', (canEditBoard() && !threadEndpointIds.has(n.id)) ? null : 'none');
-    g.select('.lock-badge').attr('x', -12).attr('y', -d.cellHeight / 2 + 3)
-      .style('display', isNodeLocked(n) ? 'block' : 'none');
     g.select('.balloon-origin-badge').attr('x', d.cellWidth + 3).attr('y', -d.cellHeight / 2 + 10)
       .style('display', n.fromBalloon ? 'block' : 'none');
     const committed = nodeIsCommitted(n);
