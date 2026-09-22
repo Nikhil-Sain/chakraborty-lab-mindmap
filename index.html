@@ -191,6 +191,15 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .balloon-body{transition:filter 0.15s}
 .balloon-body:hover{filter:brightness(1.1)}
 .balloon-done{cursor:default}
+.balloon-inline-editor{background:#1e1b4b;border:1.5px solid #818cf8;border-radius:8px;padding:7px;font-family:'Segoe UI',system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.45);box-sizing:border-box;width:100%}
+.bie-text{width:100%;resize:none;background:rgba(255,255,255,.1);border:1px solid #4338ca;border-radius:4px;color:#fff;padding:4px 6px;font-size:10px;font-family:inherit;box-sizing:border-box;outline:none;line-height:1.3;min-height:28px}
+.bie-points{display:flex;flex-direction:column;gap:3px;margin-top:5px}
+.bie-point-row{display:flex;gap:3px;align-items:flex-start}
+.bie-pt-ta{flex:1;resize:none;background:rgba(255,255,255,.08);border:1px solid rgba(129,140,248,.4);border-radius:3px;color:#e0e7ff;padding:3px 5px;font-size:9px;font-family:inherit;outline:none;min-height:24px;line-height:1.3;box-sizing:border-box}
+.bie-pt-rm{background:rgba(239,68,68,.2);border:none;color:#fca5a5;font-size:12px;border-radius:3px;padding:2px 5px;cursor:pointer;line-height:1;flex-shrink:0}
+.bie-footer{display:flex;gap:4px;margin-top:5px}
+.bie-add-pt{flex:1;background:rgba(99,102,241,.25);border:1px solid #6366f1;border-radius:4px;color:#a5b4fc;font-size:9px;padding:3px 5px;cursor:pointer;font-family:inherit}
+.bie-done{background:#4338ca;border:none;border-radius:4px;color:#fff;font-size:9px;padding:3px 8px;cursor:pointer;font-family:inherit;font-weight:700}
 
 /* ── Modals ── */
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center}
@@ -430,26 +439,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
     </div>
     <div class="modal-footer" style="margin-top:12px">
       <button class="btn btn-dismiss" onclick="closeBalloonPopDialog()">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── ADD BALLOON MODAL ── -->
-<div class="overlay" id="ov-balloon-add">
-  <div class="modal" style="width:340px">
-    <h3>🎈 Add Balloon Task</h3>
-    <div class="fg">
-      <label>Task <span style="font-weight:400;opacity:0.6;font-size:10px">(max 5 words)</span></label>
-      <textarea id="ba-text" placeholder="What needs to be done?" style="height:52px"></textarea>
-    </div>
-    <div class="fg">
-      <label>Description points</label>
-      <div id="ba-points-list" style="display:flex;flex-direction:column;gap:5px;margin-bottom:6px"></div>
-      <button class="btn" type="button" style="font-size:11px;padding:5px 10px;background:#f0f4ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:6px" onclick="addBalloonAddPoint()">+ Add point</button>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-dismiss" onclick="closeBalloonAddModal()">Cancel</button>
-      <button class="btn btn-save" onclick="saveBalloonAddModal()">Save</button>
     </div>
   </div>
 </div>
@@ -1802,9 +1791,8 @@ document.getElementById('ov-import-confirm').addEventListener('click', e => { if
 document.getElementById('ic-password').addEventListener('keydown', e => { if (e.key === 'Enter') confirmImportWithPassword(); });
 document.getElementById('ov-delete-confirm').addEventListener('click', e => { if (e.target.id === 'ov-delete-confirm') closeDeleteConfirm(); });
 document.getElementById('ov-balloon-pop').addEventListener('click', e => { if (e.target.id === 'ov-balloon-pop') closeBalloonPopDialog(); });
-document.getElementById('ov-balloon-add').addEventListener('click', e => { if (e.target.id === 'ov-balloon-add') closeBalloonAddModal(); });
 document.getElementById('dc-password').addEventListener('keydown', e => { if (e.key === 'Enter') confirmDeleteWithPassword(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeNodeModal(); closeConnectModal(); closeImportConfirm(); closeDeleteConfirm(); closeBalloonAddModal(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeNodeModal(); closeConnectModal(); closeImportConfirm(); closeDeleteConfirm(); } });
 
 const KIND_LABEL = { node: 'Node', sub: 'Sub Node', subsub: 'Micro Node' };
 
@@ -3636,47 +3624,85 @@ const BALLOON_COLORS = {
 };
 const BALLOON_PRIORITY_ORDER = ['low', 'medium', 'high'];
 
-let _balloonAddNodeId = null;
-function openBalloonAddModal(nodeId) {
-  _balloonAddNodeId = nodeId;
-  document.getElementById('ba-text').value = '';
-  document.getElementById('ba-points-list').innerHTML = '';
-  document.getElementById('ov-balloon-add').classList.add('open');
-  setTimeout(() => document.getElementById('ba-text').focus(), 50);
+let _newBalloonEdit = null;
+function openBalloonInlineEditor(nodeId, balloonId, bx, bodyY, gParent) {
+  d3.selectAll('.balloon-create-fo').remove();
+  const BRX = 28, BRY = 32;
+  const fo = gParent.append('foreignObject').attr('class', 'balloon-create-fo')
+    .attr('x', bx + BRX + 6).attr('y', bodyY - BRY).attr('width', 150).attr('height', 300);
+  fo.html(`<div class="balloon-inline-editor" xmlns="http://www.w3.org/1999/xhtml">
+    <textarea class="bie-text" placeholder="Task name (max 5 words)" rows="1"></textarea>
+    <div class="bie-points"></div>
+    <div class="bie-footer">
+      <button class="bie-add-pt" type="button">+ Add point</button>
+      <button class="bie-done" type="button">✓ Done</button>
+    </div>
+  </div>`);
+  const foNode = fo.node();
+  const textEl = foNode.querySelector('.bie-text');
+  const pointsList = foNode.querySelector('.bie-points');
+  foNode.addEventListener('mousedown', e => e.stopPropagation());
+  foNode.addEventListener('click', e => e.stopPropagation());
+  textEl.addEventListener('input', () => {
+    textEl.style.height = '28px'; textEl.style.height = textEl.scrollHeight + 'px';
+    applyWordCap(textEl, 5);
+  });
+  function addPointRow() {
+    const row = document.createElement('div'); row.className = 'bie-point-row';
+    const ta = document.createElement('textarea'); ta.className = 'bie-pt-ta'; ta.rows = 1; ta.placeholder = 'Add a point…';
+    ta.addEventListener('input', () => { ta.style.height = '24px'; ta.style.height = ta.scrollHeight + 'px'; fitFo(); });
+    const rm = document.createElement('button'); rm.className = 'bie-pt-rm'; rm.textContent = '×'; rm.type = 'button';
+    rm.addEventListener('mousedown', e => e.stopPropagation());
+    rm.addEventListener('click', e => { e.stopPropagation(); pointsList.removeChild(row); fitFo(); });
+    row.append(ta, rm); pointsList.append(row); ta.focus(); fitFo();
+  }
+  function fitFo() {
+    requestAnimationFrame(() => {
+      const el = foNode.querySelector('.balloon-inline-editor');
+      if (el) { const h = el.getBoundingClientRect().height; if (h > 0) fo.attr('height', Math.ceil(h) + 10); }
+    });
+  }
+  function commit() {
+    fo.remove();
+    const raw = (textEl.value || '').trim();
+    const text = raw ? raw.split(/\s+/).slice(0, 5).join(' ') : 'New task';
+    const points = Array.from(pointsList.querySelectorAll('.bie-pt-ta')).map(t => t.value.trim()).filter(Boolean);
+    const m = activeMember(); if (!m) return;
+    const node = findNode(m, nodeId); if (!node) return;
+    const b = (node.balloons || []).find(x => x.id === balloonId); if (!b) return;
+    b.text = text; b.points = points; save(); buildD3Map();
+  }
+  function cancel() {
+    fo.remove();
+    const m = activeMember(); if (!m) return;
+    const node = findNode(m, nodeId); if (!node) return;
+    node.balloons = (node.balloons || []).filter(x => x.id !== balloonId); save(); buildD3Map();
+  }
+  foNode.querySelector('.bie-add-pt').addEventListener('mousedown', e => e.stopPropagation());
+  foNode.querySelector('.bie-add-pt').addEventListener('click', e => { e.stopPropagation(); addPointRow(); });
+  foNode.querySelector('.bie-done').addEventListener('mousedown', e => e.stopPropagation());
+  foNode.querySelector('.bie-done').addEventListener('click', e => { e.stopPropagation(); commit(); });
+  textEl.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addPointRow(); }
+  });
+  setTimeout(() => {
+    textEl.focus(); textEl.select();
+    function outsideClick(e) {
+      if (!foNode.contains(e.target)) { document.removeEventListener('mousedown', outsideClick); commit(); }
+    }
+    document.addEventListener('mousedown', outsideClick);
+  }, 80);
 }
-function closeBalloonAddModal() {
-  _balloonAddNodeId = null;
-  document.getElementById('ov-balloon-add').classList.remove('open');
-}
-function addBalloonAddPoint() {
-  const list = document.getElementById('ba-points-list');
-  const row = document.createElement('div');
-  row.style.cssText = 'display:flex;gap:5px;align-items:flex-start';
-  const ta = document.createElement('textarea');
-  ta.placeholder = 'Add a point…';
-  ta.style.cssText = 'flex:1;resize:none;height:32px;font-size:11px;padding:5px 7px;border-radius:5px;border:1.5px solid #c7d2fe;font-family:inherit;background:#f5f3ff;color:#1e1b4b;box-sizing:border-box';
-  ta.addEventListener('input', () => { ta.style.height = '32px'; ta.style.height = ta.scrollHeight + 'px'; });
-  const rm = document.createElement('button');
-  rm.textContent = '×'; rm.type = 'button';
-  rm.style.cssText = 'background:#fee2e2;border:none;color:#b91c1c;font-size:15px;border-radius:4px;padding:3px 7px;cursor:pointer;line-height:1;flex-shrink:0;margin-top:1px';
-  rm.onclick = () => list.removeChild(row);
-  row.append(ta, rm); list.append(row); ta.focus();
-}
-function saveBalloonAddModal() {
-  const nodeId = _balloonAddNodeId;
-  const raw = (document.getElementById('ba-text').value || '').trim();
-  const text = raw ? raw.split(/\s+/).slice(0, 5).join(' ') : 'New task';
-  const points = Array.from(document.querySelectorAll('#ba-points-list textarea'))
-    .map(el => el.value.trim()).filter(Boolean);
-  closeBalloonAddModal();
+function addBalloon(nodeId) {
   const m = activeMember(); if (!m || !canEditBoard()) return;
   const node = findNode(m, nodeId); if (!node) return;
   if (!node.balloons) node.balloons = [];
   const id = 'bl' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-  node.balloons.push({ id, text, priority: 'medium', done: false, addedAt: Date.now(), points });
+  node.balloons.push({ id, text: '', priority: 'medium', done: false, addedAt: Date.now(), points: [] });
+  _newBalloonEdit = { nodeId, balloonId: id };
   save(); buildD3Map();
 }
-function addBalloon(nodeId) { openBalloonAddModal(nodeId); }
 
 function cycleBalloonPriority(nodeId, balloonId) {
   const m = activeMember(); if (!m || !canEditBoard()) return;
@@ -3942,6 +3968,12 @@ function drawBalloons(g, d) {
       .style('pointer-events', 'none').style('user-select', 'none')
       .text(b.priority === 'high' ? '●●●' : b.priority === 'medium' ? '●●○' : '●○○');
     if (canEdit) dotsG.append('title').text('Click to cycle priority: low → medium → high');
+
+    // Auto-open inline editor for a balloon just created via the "+" button
+    if (_newBalloonEdit && _newBalloonEdit.nodeId === n.id && _newBalloonEdit.balloonId === b.id) {
+      _newBalloonEdit = null;
+      openBalloonInlineEditor(n.id, b.id, bx, bodyY, g);
+    }
 
     // ×  button at top-right of balloon
     if (canEdit) {
