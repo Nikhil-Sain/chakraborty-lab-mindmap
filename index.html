@@ -2712,7 +2712,9 @@ function mapUpdate(source) {
   // node's touching lines out with a small symmetric offset so they leave/arrive separated.
   const fanTotal = {}, fanUsed = {};
   const bump = id => { fanTotal[id] = (fanTotal[id] || 0) + 1; };
-  links.forEach(l => { bump(l.source.data.id); bump(l.target.data.id); });
+  // Root smiley sources are pinned to a single circumference point — don't count them as
+  // fan-spread participants, so connection fan slots are computed from connections only.
+  links.forEach(l => { if (l.source.data.type !== 'root') bump(l.source.data.id); bump(l.target.data.id); });
   (m.connections || []).forEach(c => { bump(c.a); bump(c.b); });
   // fanOffset(id) advances a shared counter each time it's called for a given id, so it must
   // be called exactly ONCE per line-endpoint and the {dx,dy} result reused everywhere that
@@ -2759,9 +2761,16 @@ function mapUpdate(source) {
   // assigning fan slots, so a parent's exits are always ordered top-to-bottom to match the
   // visual order of its children — no crossing after a node is dragged up or down.
   [...links].sort((a, b) => a.target.x - b.target.x).forEach(d => {
-    const so = fanOffset(d.source.data.id), to = fanOffset(d.target.data.id);
+    const isRootSource = d.source.data.type === 'root';
+    // Root smiley doesn't fan — all exits leave from one fixed point on its right circumference.
+    const so = isRootSource ? null : fanOffset(d.source.data.id);
+    const to = fanOffset(d.target.data.id);
     treeLinkFanOffset.set(d.target.data.id, { so, to });
-    linkPos.set(d.target.data.id, { sp: applyOffset(nodePos(d.source), so), tp: applyOffset(nodePos(d.target), to) });
+    const rawSource = nodePos(d.source);
+    const sp = isRootSource
+      ? { x: rawSource.x + ROOT_EMOJI_SIZE / 2, y: rawSource.y, w: 0 }
+      : applyOffset(rawSource, so);
+    linkPos.set(d.target.data.id, { sp, tp: applyOffset(nodePos(d.target), to) });
   });
   linkMerged.transition().duration(duration).style('opacity', 1)
     .attr('d', d => { const p = linkPos.get(d.target.data.id); return curvePath(p.sp, p.tp); });
