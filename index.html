@@ -2752,7 +2752,10 @@ function mapUpdate(source) {
   // from the line it's supposed to belong to.
   const linkPos = new Map();
   treeLinkFanOffset = new Map();
-  links.forEach(d => {
+  // Sort by target's vertical position (d.target.x = screen Y in D3's horizontal tree) before
+  // assigning fan slots, so a parent's exits are always ordered top-to-bottom to match the
+  // visual order of its children — no crossing after a node is dragged up or down.
+  [...links].sort((a, b) => a.target.x - b.target.x).forEach(d => {
     const so = fanOffset(d.source.data.id), to = fanOffset(d.target.data.id);
     treeLinkFanOffset.set(d.target.data.id, { so, to });
     linkPos.set(d.target.data.id, { sp: applyOffset(nodePos(d.source), so), tp: applyOffset(nodePos(d.target), to) });
