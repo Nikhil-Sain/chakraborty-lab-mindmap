@@ -2962,7 +2962,11 @@ function mapUpdate(source) {
     // Committed (locked) nodes keep their full color and stay draggable — only content
     // editing (text/date/kind/bullets/delete) is frozen, so the lock badge alone marks it.
     g.select('.editable-label').style('cursor', canEditNode(n) ? 'text' : 'default');
-    g.select('.drag-handle').style('display', (canEditBoard() && !threadEndpointIds.has(n.id)) ? null : 'none');
+    // Thread endpoint handles are raised to the top via .raise() and win click conflicts
+    // naturally — hiding the drag handle on endpoint nodes prevents repositioning them while
+    // a connection is selected, which is exactly when the user most wants to move them.
+    g.select('.drag-handle').style('display', !!firebaseUser ? null : 'none');
+    g.select('.drag-handle').style('opacity', canEditBoard() ? null : '0.4');
     g.select('.balloon-origin-badge').attr('x', d.cellWidth + 3).attr('y', -d.cellHeight / 2 + 10)
       .style('display', n.fromBalloon ? 'block' : 'none');
     const committed = nodeIsCommitted(n);
@@ -3168,7 +3172,7 @@ function topicDragBehavior() {
     .on('start', function (event, d) {
       event.sourceEvent.stopPropagation();
       // Repositioning is exempt from the commit lock — only content edits are frozen.
-      dragAllowed = canEditBoard();
+      dragAllowed = !!firebaseUser;
       curX = d.x;
       curY = d.y;
     })
@@ -3231,8 +3235,8 @@ function topicDragBehavior() {
       const curNode = findNode(curM, dragNodeId); if (!curNode) return;
       curNode.manualY = curX;
       curNode.manualX = curY;
-      save();
-      buildD3Map();
+      if (canEditBoard()) save(); // persists to Firestore (admin or own board)
+      buildD3Map(); // always rebuild to apply the new position immediately
     });
 }
 
