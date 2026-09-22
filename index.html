@@ -2723,7 +2723,10 @@ function mapUpdate(source) {
     const total = fanTotal[id] || 1;
     if (total <= 1) return null;
     const idx = (fanUsed[id] = (fanUsed[id] || 0) + 1) - 1;
-    const offset = (idx - (total - 1) / 2) * 9;
+    // Cap total spread at 36px so heavily-connected nodes (like the project root with 30+
+    // children) don't scatter their exits across hundreds of pixels.
+    const nudge = Math.min(9, 36 / Math.max(total - 1, 1));
+    const offset = (idx - (total - 1) / 2) * nudge;
     // Nudging only the vertical component only actually separates lines that leave from a
     // left/right edge — for lines whose nearest edge turns out to be top/bottom (e.g. a
     // parent and its Sub Nodes sitting in the very same week), that edge's anchor x is
