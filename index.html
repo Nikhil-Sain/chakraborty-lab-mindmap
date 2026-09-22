@@ -434,6 +434,26 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
   </div>
 </div>
 
+<!-- ── ADD BALLOON MODAL ── -->
+<div class="overlay" id="ov-balloon-add">
+  <div class="modal" style="width:340px">
+    <h3>🎈 Add Balloon Task</h3>
+    <div class="fg">
+      <label>Task <span style="font-weight:400;opacity:0.6;font-size:10px">(max 5 words)</span></label>
+      <textarea id="ba-text" placeholder="What needs to be done?" style="height:52px"></textarea>
+    </div>
+    <div class="fg">
+      <label>Description points</label>
+      <div id="ba-points-list" style="display:flex;flex-direction:column;gap:5px;margin-bottom:6px"></div>
+      <button class="btn" type="button" style="font-size:11px;padding:5px 10px;background:#f0f4ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:6px" onclick="addBalloonAddPoint()">+ Add point</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-dismiss" onclick="closeBalloonAddModal()">Cancel</button>
+      <button class="btn btn-save" onclick="saveBalloonAddModal()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── ADMIN DELETE CONFIRMATION: re-enter your password before any admin deletion ── -->
 <div class="overlay" id="ov-delete-confirm">
   <div class="modal">
@@ -1782,8 +1802,9 @@ document.getElementById('ov-import-confirm').addEventListener('click', e => { if
 document.getElementById('ic-password').addEventListener('keydown', e => { if (e.key === 'Enter') confirmImportWithPassword(); });
 document.getElementById('ov-delete-confirm').addEventListener('click', e => { if (e.target.id === 'ov-delete-confirm') closeDeleteConfirm(); });
 document.getElementById('ov-balloon-pop').addEventListener('click', e => { if (e.target.id === 'ov-balloon-pop') closeBalloonPopDialog(); });
+document.getElementById('ov-balloon-add').addEventListener('click', e => { if (e.target.id === 'ov-balloon-add') closeBalloonAddModal(); });
 document.getElementById('dc-password').addEventListener('keydown', e => { if (e.key === 'Enter') confirmDeleteWithPassword(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeNodeModal(); closeConnectModal(); closeImportConfirm(); closeDeleteConfirm(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeNodeModal(); closeConnectModal(); closeImportConfirm(); closeDeleteConfirm(); closeBalloonAddModal(); } });
 
 const KIND_LABEL = { node: 'Node', sub: 'Sub Node', subsub: 'Micro Node' };
 
@@ -3615,14 +3636,47 @@ const BALLOON_COLORS = {
 };
 const BALLOON_PRIORITY_ORDER = ['low', 'medium', 'high'];
 
-function addBalloon(nodeId) {
+let _balloonAddNodeId = null;
+function openBalloonAddModal(nodeId) {
+  _balloonAddNodeId = nodeId;
+  document.getElementById('ba-text').value = '';
+  document.getElementById('ba-points-list').innerHTML = '';
+  document.getElementById('ov-balloon-add').classList.add('open');
+  setTimeout(() => document.getElementById('ba-text').focus(), 50);
+}
+function closeBalloonAddModal() {
+  _balloonAddNodeId = null;
+  document.getElementById('ov-balloon-add').classList.remove('open');
+}
+function addBalloonAddPoint() {
+  const list = document.getElementById('ba-points-list');
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:5px;align-items:flex-start';
+  const ta = document.createElement('textarea');
+  ta.placeholder = 'Add a point…';
+  ta.style.cssText = 'flex:1;resize:none;height:32px;font-size:11px;padding:5px 7px;border-radius:5px;border:1.5px solid #c7d2fe;font-family:inherit;background:#f5f3ff;color:#1e1b4b;box-sizing:border-box';
+  ta.addEventListener('input', () => { ta.style.height = '32px'; ta.style.height = ta.scrollHeight + 'px'; });
+  const rm = document.createElement('button');
+  rm.textContent = '×'; rm.type = 'button';
+  rm.style.cssText = 'background:#fee2e2;border:none;color:#b91c1c;font-size:15px;border-radius:4px;padding:3px 7px;cursor:pointer;line-height:1;flex-shrink:0;margin-top:1px';
+  rm.onclick = () => list.removeChild(row);
+  row.append(ta, rm); list.append(row); ta.focus();
+}
+function saveBalloonAddModal() {
+  const nodeId = _balloonAddNodeId;
+  const raw = (document.getElementById('ba-text').value || '').trim();
+  const text = raw ? raw.split(/\s+/).slice(0, 5).join(' ') : 'New task';
+  const points = Array.from(document.querySelectorAll('#ba-points-list textarea'))
+    .map(el => el.value.trim()).filter(Boolean);
+  closeBalloonAddModal();
   const m = activeMember(); if (!m || !canEditBoard()) return;
   const node = findNode(m, nodeId); if (!node) return;
   if (!node.balloons) node.balloons = [];
   const id = 'bl' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-  node.balloons.push({ id, text: 'New task', priority: 'medium', done: false, addedAt: Date.now(), points: [] });
+  node.balloons.push({ id, text, priority: 'medium', done: false, addedAt: Date.now(), points });
   save(); buildD3Map();
 }
+function addBalloon(nodeId) { openBalloonAddModal(nodeId); }
 
 function cycleBalloonPriority(nodeId, balloonId) {
   const m = activeMember(); if (!m || !canEditBoard()) return;
