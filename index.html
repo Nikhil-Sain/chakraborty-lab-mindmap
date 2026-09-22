@@ -203,9 +203,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .tl-table{border-collapse:collapse;min-width:100%;table-layout:fixed}
 .tl-table th,.tl-table td{border-right:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;padding:0;vertical-align:top}
 .tl-table th:last-child,.tl-table td:last-child{border-right:none}
-.tl-proj-th{position:sticky;left:0;z-index:3;background:#fff;border-right:2px solid #c7d2fe !important;min-width:140px;max-width:140px;width:140px}
-.tl-proj-td{position:sticky;left:0;z-index:2;background:#fff;border-right:2px solid #c7d2fe !important;min-width:140px;max-width:140px;width:140px}
-.tl-proj-cell{display:flex;align-items:center;gap:7px;padding:10px 10px;font-size:12px;font-weight:700;color:#1e293b;min-height:60px}
+.tl-proj-th{position:sticky;left:0;z-index:3;background:#fff;border-right:2px solid #c7d2fe !important;min-width:100px;max-width:100px;width:100px}
+.tl-proj-td{position:sticky;left:0;z-index:2;background:#fff;border-right:2px solid #c7d2fe !important;min-width:100px;max-width:100px;width:100px}
+.tl-proj-cell{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:8px 7px;font-size:11px;font-weight:700;color:#1e293b;min-height:56px}
 .tl-proj-name{word-break:break-word;line-height:1.3}
 .tl-period-th{min-width:130px;width:130px;max-width:130px;padding:8px 10px;font-size:11px;font-weight:700;color:#64748b;text-align:center;background:#f8fafc;position:sticky;top:0;z-index:1;white-space:nowrap}
 .tl-period-th.tl-today-col{background:#eff6ff;color:#1d4ed8}
@@ -4132,20 +4132,47 @@ function collectProjectNodes(m) {
   return rows;
 }
 
+function shiftPeriodKey(key, gran, delta) {
+  if (gran === 'month') {
+    const [y, mo] = key.split('-').map(Number);
+    const d = new Date(y, mo - 1 + delta, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+  if (gran === 'quarter') {
+    const [y, q] = [+key.slice(0, 4), +key.slice(6)];
+    let nq = q - 1 + delta, ny = y + Math.floor(nq / 4); nq = ((nq % 4) + 4) % 4 + 1;
+    return `${ny}-Q${nq}`;
+  }
+  if (gran === 'halfyear') {
+    const y = +key.slice(0, 4), h = +key.slice(6);
+    let nh = h - 1 + delta, ny = y + Math.floor(nh / 2); nh = ((nh % 2) + 2) % 2 + 1;
+    return `${ny}-H${nh}`;
+  }
+  return String(+key + delta);
+}
 function renderTimeline() {
   const m = activeMember(); if (!m) return;
-  // Update active granularity button
   document.querySelectorAll('.tl-gran-btn').forEach(b => b.classList.remove('tl-active'));
   const gBtn = document.getElementById('tl-g-' + tlGranularity); if (gBtn) gBtn.classList.add('tl-active');
 
-  const allRows = collectProjectNodes(m);
+  // Only show visible (non-hidden) projects — respects the filter panel selection
+  const visibleProjects = (m.projects || []).filter(p => !isProjectHidden(m.id, p.id));
+
+  const allRows = collectProjectNodes(m).filter(r => !isProjectHidden(m.id, r.projectId));
   const todayKey = todayPeriodKey(tlGranularity);
 
-  // Collect all period keys that have at least one node, then sort
+  // Build period range from node dates, always including today, always at least 4 periods
   const periodSet = new Set(allRows.map(r => dateToPeriodKey(r.node.date, tlGranularity)));
-  // Always include today's period
   periodSet.add(todayKey);
-  const periods = [...periodSet].sort();
+  let periods = [...periodSet].sort();
+  // Pad forward until we have at least 4 periods
+  while (periods.length < 4) periods.push(shiftPeriodKey(periods[periods.length - 1], tlGranularity, 1));
+
+  // Compute column width: fill available width so exactly 4 columns show, never smaller than 90px
+  const wrap = document.getElementById('timeline-wrap');
+  const projColW = 100;
+  const availW = (wrap ? wrap.clientWidth : 800) - projColW - 2;
+  const colW = Math.max(90, Math.floor(availW / 4));
 
   // Group nodes by projectId → periodKey → [nodes]
   const projMap = {};
@@ -4157,15 +4184,12 @@ function renderTimeline() {
     projMap[pid][pk].push(node);
   });
 
-  const projects = (m.projects && m.projects.length) ? m.projects : [{ id: '__none__', name: 'Project', points: [] }];
-
+  const projects = visibleProjects.length ? visibleProjects : [{ id: '__none__', name: 'Project', points: [] }];
   const table = document.getElementById('tl-table');
-  const colW = tlGranularity === 'year' ? 180 : tlGranularity === 'halfyear' ? 160 : tlGranularity === 'quarter' ? 150 : 130;
 
-  let html = '<colgroup><col style="width:140px;min-width:140px"></colgroup>';
-
-  // Header row
-  html += '<thead><tr><th class="tl-proj-th" style="padding:8px 10px;font-size:11px;font-weight:700;color:#64748b;text-align:left;position:sticky;top:0;left:0;z-index:4;background:#f8fafc">Project</th>';
+  let html = `<colgroup><col style="width:${projColW}px;min-width:${projColW}px"></colgroup>`;
+  html += '<thead><tr>';
+  html += `<th class="tl-proj-th" style="padding:6px 8px;font-size:10px;font-weight:700;color:#64748b;text-align:left;position:sticky;top:0;left:0;z-index:4;background:#f8fafc">Project</th>`;
   periods.forEach(pk => {
     const isToday = pk === todayKey;
     html += `<th class="tl-period-th${isToday ? ' tl-today-col' : ''}" style="min-width:${colW}px;width:${colW}px">${periodLabel(pk, tlGranularity)}${isToday ? '<span class="tl-today-chip">now</span>' : ''}</th>`;
@@ -4175,12 +4199,8 @@ function renderTimeline() {
   projects.forEach(proj => {
     const pid = proj.id;
     const cells = projMap[pid] || {};
-    const hasCells = periods.some(pk => cells[pk] && cells[pk].length);
-    if (!hasCells && !Object.keys(cells).length) {
-      // Show row anyway if project exists, just empty
-    }
-    html += `<tr>`;
-    html += `<td class="tl-proj-td"><div class="tl-proj-cell"><span style="font-size:22px;line-height:1">🙂</span><span class="tl-proj-name">${escapeHtml(proj.name || 'Project')}</span></div></td>`;
+    html += '<tr>';
+    html += `<td class="tl-proj-td"><div class="tl-proj-cell"><span style="font-size:18px;line-height:1">🙂</span><span class="tl-proj-name" style="font-size:10px;line-height:1.25;word-break:break-word">${escapeHtml(proj.name || 'Project')}</span></div></td>`;
     periods.forEach(pk => {
       const nodes = cells[pk] || [];
       const isToday = pk === todayKey;
@@ -4192,14 +4212,14 @@ function renderTimeline() {
           const kindCls = kind === 'node' ? 'k-node' : kind === 'subsub' ? 'k-subsub' : 'k-sub';
           const balloonCount = (n.balloons || []).filter(b => !b.done).length;
           const childCount = (n.children || []).length;
-          const depth = n.kind === 'node' ? '' : n.kind === 'subsub' ? ' style="margin-left:10px"' : ' style="margin-left:5px"';
-          html += `<div class="tl-card" onclick="tlGoToNode('${n.id}')" title="Jump to this node in the map"${depth}>
+          const indent = kind === 'subsub' ? ' style="margin-left:10px"' : kind === 'sub' ? ' style="margin-left:5px"' : '';
+          html += `<div class="tl-card" onclick="tlGoToNode('${n.id}')" title="Jump to this node in the map"${indent}>
             <div class="tl-card-row">
               <span class="tl-card-kind ${kindCls}">${kindSym}</span>
               <span class="tl-card-text">${escapeHtml(n.text || '—')}</span>
             </div>
             <div class="tl-card-meta">
-              <span>${new Date((n.date || todayStr()) + 'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
+              <span>${new Date((n.date||todayStr())+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
               ${balloonCount ? `<span class="tl-card-balloon">🎈×${balloonCount}</span>` : ''}
               ${childCount ? `<span>↳${childCount}</span>` : ''}
             </div>
