@@ -1786,6 +1786,47 @@ document.getElementById('dc-password').addEventListener('keydown', e => { if (e.
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeNodeModal(); closeConnectModal(); closeImportConfirm(); closeDeleteConfirm(); } });
 
 const KIND_LABEL = { node: 'Node', sub: 'Sub Node', subsub: 'Micro Node' };
+
+// Places a newly created node at the vertical height of its reference node (natural eye-level),
+// then shifts every existing node in the same week column that sits at or below that Y downward
+// to open a gap — so the map grows outward horizontally rather than piling up at the bottom.
+function positionNewNode(m, newTopic, referenceNodeId) {
+  const MIN_H = 26, LINE_H = 13, PAD_Y = 9, ROW_GAP = 18;
+  if (!referenceNodeId) return;
+  const refPos = mapNodePositions[referenceNodeId];
+  if (!refPos) return; // map hasn't been rendered yet — fall back to auto-stack
+
+  const newWeekIdx = weekOfYear(newTopic.date).absIdx;
+  const refNode = findNode(m, referenceNodeId);
+  const sameColumn = refNode && weekOfYear(refNode.date).absIdx === newWeekIdx;
+
+  const refH = refPos.h || MIN_H;
+  const estH = newTopic.kind === 'node' ? Math.max(MIN_H, LINE_H + PAD_Y) : MIN_H;
+
+  // Same column → place new node immediately below the reference (clear gap);
+  // different column → align the new node's center with the reference's center.
+  const targetY = sameColumn
+    ? refPos.y + refH / 2 + ROW_GAP + estH / 2
+    : refPos.y;
+
+  // Push every existing node in the new week column at or below targetY downward.
+  // Always shift — no collision check — so the insertion point always opens up.
+  function shiftBelow(topics) {
+    for (const n of topics) {
+      if (weekOfYear(n.date).absIdx === newWeekIdx) {
+        const curY = mapNodePositions[n.id] != null ? mapNodePositions[n.id].y : n.manualY;
+        if (curY != null && curY >= targetY) {
+          if (n.manualX == null && mapNodePositions[n.id]) n.manualX = mapNodePositions[n.id].x;
+          n.manualY = curY + estH + ROW_GAP;
+        }
+      }
+      if (n.children && n.children.length) shiftBelow(n.children);
+    }
+  }
+  shiftBelow(m.topics);
+  newTopic.manualY = targetY;
+}
+
 // All three buttons attach the new entry to whatever is currently selected (the anchor) —
 // only when nothing is selected does it fall back to the active project's root. 'kind' only
 // controls the new cell's shape/color; it never overrides where it connects from.
@@ -1812,6 +1853,7 @@ function addNodeOfType(kind, presetDate) {
       newTopic.projectId = curProj.id;
       cur.topics.push(newTopic);
     }
+    positionNewNode(cur, newTopic, anchorId || cur.lastTopicId);
     cur.lastTopicId = newTopic.id;
     save(); buildD3Map();
   });
@@ -3663,6 +3705,7 @@ function balloonPopConvert(action) {
     n.children.push(newTopic);
   }
   n.balloons = (n.balloons || []).filter(x => x.id !== balloonId);
+  positionNewNode(m, newTopic, nodeId);
   m.lastTopicId = newTopic.id;
   save(); buildD3Map();
   setTimeout(() => { const fn = findNode(activeMember(), newTopic.id); if (fn) showTopicDetail(fn); }, 120);
