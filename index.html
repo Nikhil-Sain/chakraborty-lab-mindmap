@@ -191,6 +191,40 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .balloon-body{transition:filter 0.15s}
 .balloon-body:hover{filter:brightness(1.1)}
 .balloon-done{cursor:default}
+/* ── Timeline (compact) view ── */
+#timeline-wrap{display:none;flex-direction:column;flex:1 1 auto;overflow:hidden;background:#f1f5fb;border-radius:14px 14px 0 0}
+#timeline-wrap.tl-active{display:flex}
+.tl-gran-bar{display:flex;align-items:center;gap:6px;padding:8px 14px;background:#fff;border-bottom:1.5px solid #e2e8f0;flex-shrink:0}
+.tl-gran-label{font-size:11px;font-weight:700;color:#64748b;margin-right:4px;letter-spacing:.04em;text-transform:uppercase}
+.tl-gran-btn{padding:4px 11px;border-radius:20px;border:1.5px solid #e2e8f0;background:#fff;color:#64748b;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .12s,color .12s,border-color .12s}
+.tl-gran-btn:hover{background:#f0f4ff;color:#4338ca;border-color:#c7d2fe}
+.tl-gran-btn.tl-active{background:#4338ca;color:#fff;border-color:#4338ca}
+.tl-scroll-wrap{overflow-x:auto;flex:1 1 auto;overflow-y:auto}
+.tl-table{border-collapse:collapse;min-width:100%;table-layout:fixed}
+.tl-table th,.tl-table td{border-right:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;padding:0;vertical-align:top}
+.tl-table th:last-child,.tl-table td:last-child{border-right:none}
+.tl-proj-th{position:sticky;left:0;z-index:3;background:#fff;border-right:2px solid #c7d2fe !important;min-width:140px;max-width:140px;width:140px}
+.tl-proj-td{position:sticky;left:0;z-index:2;background:#fff;border-right:2px solid #c7d2fe !important;min-width:140px;max-width:140px;width:140px}
+.tl-proj-cell{display:flex;align-items:center;gap:7px;padding:10px 10px;font-size:12px;font-weight:700;color:#1e293b;min-height:60px}
+.tl-proj-name{word-break:break-word;line-height:1.3}
+.tl-period-th{min-width:130px;width:130px;max-width:130px;padding:8px 10px;font-size:11px;font-weight:700;color:#64748b;text-align:center;background:#f8fafc;position:sticky;top:0;z-index:1;white-space:nowrap}
+.tl-period-th.tl-today-col{background:#eff6ff;color:#1d4ed8}
+.tl-cell{padding:6px 7px;min-height:56px;vertical-align:top}
+.tl-cell.tl-today-col{background:rgba(219,234,254,.18)}
+.tl-card{display:flex;flex-direction:column;gap:2px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:5px 7px;margin-bottom:4px;cursor:pointer;transition:box-shadow .12s,border-color .12s;font-family:'Segoe UI',system-ui,sans-serif}
+.tl-card:hover{box-shadow:0 2px 8px rgba(99,102,241,.15);border-color:#a5b4fc}
+.tl-card-row{display:flex;align-items:center;gap:5px}
+.tl-card-kind{font-size:9px;font-weight:900;flex-shrink:0}
+.tl-card-kind.k-node{color:#059669}
+.tl-card-kind.k-sub{color:#6366f1}
+.tl-card-kind.k-subsub{color:#8b5cf6}
+.tl-card-text{font-size:11px;font-weight:600;color:#1e293b;line-height:1.3;word-break:break-word}
+.tl-card-meta{font-size:9px;color:#94a3b8;margin-top:1px;display:flex;gap:5px;align-items:center}
+.tl-card-balloon{font-size:9px;color:#d97706}
+.tl-empty-cell{color:#cbd5e1;font-size:10px;text-align:center;padding:8px 4px}
+.tl-today-chip{display:inline-block;background:#dbeafe;color:#1d4ed8;border-radius:10px;font-size:9px;font-weight:700;padding:1px 6px;margin-left:4px}
+.btn-view-toggle{padding:5px 12px;border-radius:20px;border:1.5px solid #6366f1;background:#fff;color:#4338ca;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .12s,color .12s;white-space:nowrap;margin-left:auto}
+.btn-view-toggle:hover,.btn-view-toggle.tl-on{background:#4338ca;color:#fff;border-color:#4338ca}
 .balloon-inline-editor{background:#1e1b4b;border:1.5px solid #818cf8;border-radius:8px;padding:7px;font-family:'Segoe UI',system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.45);box-sizing:border-box;width:100%}
 .bie-text{width:100%;resize:none;background:rgba(255,255,255,.1);border:1px solid #4338ca;border-radius:4px;color:#fff;padding:4px 6px;font-size:10px;font-family:inherit;box-sizing:border-box;outline:none;line-height:1.3;min-height:28px}
 .bie-points{display:flex;flex-direction:column;gap:3px;margin-top:5px}
@@ -316,6 +350,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
     <button class="btn-toolbar" id="btn-import" onclick="triggerImport()" onmouseenter="showHoverTip(event)" onmouseleave="hideHoverTip()" style="display:none">⬆ Import</button>
     <input type="file" id="import-file-input" accept="application/json" style="display:none" onchange="handleImportFile(event)">
     <span class="toolbar-hint" id="toolbar-hint"></span>
+    <button class="btn-view-toggle" id="btn-view-toggle" onclick="toggleTimelineMode()" title="Switch between mindmap and timeline overview">📅 Timeline</button>
     <div class="node-actions" id="node-actions">
       <button class="btn-node-action btn-node-edit" onclick="editSelectedNode()">✎ Edit</button>
       <button class="btn-node-action btn-node-connect" onclick="connectSelectedNode()">🔗 Connect</button>
@@ -325,6 +360,18 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
   <div id="map-wrap">
     <svg id="map-svg"></svg>
     <div id="map-empty">No data yet.</div>
+    <div id="timeline-wrap">
+      <div class="tl-gran-bar">
+        <span class="tl-gran-label">View by</span>
+        <button class="tl-gran-btn" id="tl-g-month" onclick="setTlGranularity('month')">Month</button>
+        <button class="tl-gran-btn" id="tl-g-quarter" onclick="setTlGranularity('quarter')">Quarter</button>
+        <button class="tl-gran-btn" id="tl-g-halfyear" onclick="setTlGranularity('halfyear')">Half-year</button>
+        <button class="tl-gran-btn" id="tl-g-year" onclick="setTlGranularity('year')">Year</button>
+      </div>
+      <div class="tl-scroll-wrap">
+        <table class="tl-table" id="tl-table"></table>
+      </div>
+    </div>
     <div id="detail-panel">
       <div id="detail-inner">
         <button class="detail-close" onclick="closeDetail()">✕</button>
@@ -2445,6 +2492,7 @@ function updateToolbarHint() {
 function buildD3Map() {
   updateHeaderControls();
   const m = activeMember();
+  if (tlMode) { if (m) renderTimeline(); return; }
   const svgEl = document.getElementById('map-svg');
   const emptyEl = document.getElementById('map-empty');
   const legendEl = document.getElementById('map-legend');
@@ -4019,6 +4067,163 @@ function drawBalloons(g, d) {
       .attr('font-size', 13).attr('fill', '#4338ca').style('user-select', 'none').text('+');
     addBtn.append('title').text('Add a balloon task to this node');
   }
+}
+
+// ── TIMELINE (COMPACT) VIEW ─────────────────────────────────────────────────
+let tlMode = false, tlGranularity = 'month';
+
+function toggleTimelineMode() {
+  tlMode = !tlMode;
+  const btn = document.getElementById('btn-view-toggle');
+  const svgEl = document.getElementById('map-svg');
+  const tlWrap = document.getElementById('timeline-wrap');
+  const legendEl = document.getElementById('map-legend');
+  if (tlMode) {
+    svgEl.style.display = 'none';
+    legendEl.style.display = 'none';
+    tlWrap.classList.add('tl-active');
+    btn.textContent = '🗺 Map'; btn.classList.add('tl-on');
+    renderTimeline();
+  } else {
+    tlWrap.classList.remove('tl-active');
+    svgEl.style.display = 'block';
+    legendEl.style.display = 'flex';
+    btn.textContent = '📅 Timeline'; btn.classList.remove('tl-on');
+    buildD3Map();
+  }
+}
+
+function setTlGranularity(g) {
+  tlGranularity = g;
+  document.querySelectorAll('.tl-gran-btn').forEach(b => b.classList.remove('tl-active'));
+  const el = document.getElementById('tl-g-' + g); if (el) el.classList.add('tl-active');
+  renderTimeline();
+}
+
+function dateToPeriodKey(dateStr, gran) {
+  const d = new Date((dateStr || todayStr()) + 'T00:00:00');
+  const y = d.getFullYear(), mo = d.getMonth();
+  if (gran === 'month') return `${y}-${String(mo + 1).padStart(2, '0')}`;
+  if (gran === 'quarter') return `${y}-Q${Math.floor(mo / 3) + 1}`;
+  if (gran === 'halfyear') return `${y}-H${mo < 6 ? 1 : 2}`;
+  return `${y}`;
+}
+function periodLabel(key, gran) {
+  if (gran === 'month') {
+    const [y, mo] = key.split('-');
+    return new Date(+y, +mo - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  }
+  if (gran === 'quarter') { const [y, q] = key.split('-'); return `${q} ${y}`; }
+  if (gran === 'halfyear') { const [y, h] = key.split('-'); return `${h} ${y}`; }
+  return key;
+}
+function todayPeriodKey(gran) { return dateToPeriodKey(todayStr(), gran); }
+
+function collectProjectNodes(m) {
+  const rows = [];
+  function walk(nodes, projectId) {
+    for (const n of nodes) {
+      const pid = n.projectId || projectId;
+      rows.push({ node: n, projectId: pid });
+      walk(n.children || [], pid);
+    }
+  }
+  walk(m.topics || [], null);
+  return rows;
+}
+
+function renderTimeline() {
+  const m = activeMember(); if (!m) return;
+  // Update active granularity button
+  document.querySelectorAll('.tl-gran-btn').forEach(b => b.classList.remove('tl-active'));
+  const gBtn = document.getElementById('tl-g-' + tlGranularity); if (gBtn) gBtn.classList.add('tl-active');
+
+  const allRows = collectProjectNodes(m);
+  const todayKey = todayPeriodKey(tlGranularity);
+
+  // Collect all period keys that have at least one node, then sort
+  const periodSet = new Set(allRows.map(r => dateToPeriodKey(r.node.date, tlGranularity)));
+  // Always include today's period
+  periodSet.add(todayKey);
+  const periods = [...periodSet].sort();
+
+  // Group nodes by projectId → periodKey → [nodes]
+  const projMap = {};
+  allRows.forEach(({ node, projectId }) => {
+    const pid = projectId || '__none__';
+    if (!projMap[pid]) projMap[pid] = {};
+    const pk = dateToPeriodKey(node.date, tlGranularity);
+    if (!projMap[pid][pk]) projMap[pid][pk] = [];
+    projMap[pid][pk].push(node);
+  });
+
+  const projects = (m.projects && m.projects.length) ? m.projects : [{ id: '__none__', name: 'Project', points: [] }];
+
+  const table = document.getElementById('tl-table');
+  const colW = tlGranularity === 'year' ? 180 : tlGranularity === 'halfyear' ? 160 : tlGranularity === 'quarter' ? 150 : 130;
+
+  let html = '<colgroup><col style="width:140px;min-width:140px"></colgroup>';
+
+  // Header row
+  html += '<thead><tr><th class="tl-proj-th" style="padding:8px 10px;font-size:11px;font-weight:700;color:#64748b;text-align:left;position:sticky;top:0;left:0;z-index:4;background:#f8fafc">Project</th>';
+  periods.forEach(pk => {
+    const isToday = pk === todayKey;
+    html += `<th class="tl-period-th${isToday ? ' tl-today-col' : ''}" style="min-width:${colW}px;width:${colW}px">${periodLabel(pk, tlGranularity)}${isToday ? '<span class="tl-today-chip">now</span>' : ''}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  projects.forEach(proj => {
+    const pid = proj.id;
+    const cells = projMap[pid] || {};
+    const hasCells = periods.some(pk => cells[pk] && cells[pk].length);
+    if (!hasCells && !Object.keys(cells).length) {
+      // Show row anyway if project exists, just empty
+    }
+    html += `<tr>`;
+    html += `<td class="tl-proj-td"><div class="tl-proj-cell"><span style="font-size:22px;line-height:1">🙂</span><span class="tl-proj-name">${escapeHtml(proj.name || 'Project')}</span></div></td>`;
+    periods.forEach(pk => {
+      const nodes = cells[pk] || [];
+      const isToday = pk === todayKey;
+      html += `<td class="tl-cell${isToday ? ' tl-today-col' : ''}">`;
+      if (nodes.length) {
+        nodes.forEach(n => {
+          const kind = n.kind || 'sub';
+          const kindSym = kind === 'node' ? '●' : kind === 'subsub' ? '◆' : '■';
+          const kindCls = kind === 'node' ? 'k-node' : kind === 'subsub' ? 'k-subsub' : 'k-sub';
+          const balloonCount = (n.balloons || []).filter(b => !b.done).length;
+          const childCount = (n.children || []).length;
+          const depth = n.kind === 'node' ? '' : n.kind === 'subsub' ? ' style="margin-left:10px"' : ' style="margin-left:5px"';
+          html += `<div class="tl-card" onclick="tlGoToNode('${n.id}')" title="Jump to this node in the map"${depth}>
+            <div class="tl-card-row">
+              <span class="tl-card-kind ${kindCls}">${kindSym}</span>
+              <span class="tl-card-text">${escapeHtml(n.text || '—')}</span>
+            </div>
+            <div class="tl-card-meta">
+              <span>${new Date((n.date || todayStr()) + 'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
+              ${balloonCount ? `<span class="tl-card-balloon">🎈×${balloonCount}</span>` : ''}
+              ${childCount ? `<span>↳${childCount}</span>` : ''}
+            </div>
+          </div>`;
+        });
+      } else {
+        html += `<div class="tl-empty-cell">·</div>`;
+      }
+      html += '</td>';
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  table.innerHTML = html;
+}
+
+function tlGoToNode(nodeId) {
+  // Switch to map view and select that node
+  if (tlMode) toggleTimelineMode();
+  setTimeout(() => {
+    const m = activeMember(); if (!m) return;
+    const n = findNode(m, nodeId); if (!n) return;
+    m.lastTopicId = n.id; showTopicDetail(n); buildD3Map();
+  }, 80);
 }
 
 function isAnchor(d, m) {
