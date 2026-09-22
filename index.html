@@ -2766,9 +2766,12 @@ function mapUpdate(source) {
     const to = fanOffset(d.target.data.id);
     treeLinkFanOffset.set(d.target.data.id, { so: null, to });
     const rawSource = nodePos(d.source);
-    const sp = rawSource.w
-      ? { x: rawSource.x + rawSource.w, y: rawSource.y, w: 0 }
-      : { x: rawSource.x + ROOT_EMOJI_SIZE / 2, y: rawSource.y, w: 0 };
+    // Root smiley (w:0): pin to a fixed point on the right circumference.
+    // Topic nodes: pass the full rect so edgeAnchor picks right-edge for cross-week children
+    // and bottom-center for same-week children placed directly below.
+    const sp = rawSource.w === 0
+      ? { x: rawSource.x + ROOT_EMOJI_SIZE / 2, y: rawSource.y, w: 0 }
+      : rawSource;
     linkPos.set(d.target.data.id, { sp, tp: applyOffset(nodePos(d.target), to) });
   });
   linkMerged.transition().duration(duration).style('opacity', 1)
