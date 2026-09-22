@@ -4350,7 +4350,26 @@ function onNodeClick(d) {
 }
 function resetMapView() {
   if (!mapSvgSel || !mapZoom) return;
-  mapSvgSel.transition().duration(500).call(mapZoom.transform, d3.zoomIdentity.translate(16, 40).scale(0.9));
+  const svgEl = mapSvgSel.node();
+  const svgW = svgEl.clientWidth || 800;
+  if (!mapRange || !mapColX.length) {
+    mapSvgSel.transition().duration(500).call(mapZoom.transform, d3.zoomIdentity.translate(16, 40).scale(0.9));
+    return;
+  }
+  const leftMargin = 190;
+  const todayAbsIdx = absWeekIndex(new Date());
+  const todayCol = Math.max(0, Math.min(mapColX.length - 1, todayAbsIdx - mapRange.minIdx));
+  const todayColW = mapColWidths[todayCol] || 220;
+  const todayColX = mapColX[todayCol];
+  // Compute the span of ±3 columns around today to determine scale
+  const c0 = Math.max(0, todayCol - 3);
+  const c1 = Math.min(mapColX.length - 1, todayCol + 3);
+  const spanW = (mapColX[c1] + (mapColWidths[c1] || 220)) - mapColX[c0];
+  const scale = Math.min(1.0, Math.max(0.35, (svgW - 20) / (leftMargin + spanW)));
+  // Center today's column horizontally in the viewport
+  const todayCenterAtScale = todayColX * scale + todayColW * scale / 2;
+  const tx = svgW / 2 - todayCenterAtScale;
+  mapSvgSel.transition().duration(500).call(mapZoom.transform, d3.zoomIdentity.translate(tx, 40).scale(scale));
 }
 window.addEventListener('resize', () => buildD3Map());
 
