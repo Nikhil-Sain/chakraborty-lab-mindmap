@@ -772,7 +772,7 @@ function isDateAllowed(m, dateStr) {
   return true;
 }
 let nodeModalCallback = null;
-let mapRoot = null, mapZoom = null, mapSvgSel = null, mapInner = null, mapNodePositions = {}, mapNodeId = 0;
+let mapRoot = null, mapZoom = null, mapSvgSel = null, mapInner = null, mapNodePositions = {}, mapNodeLaneTop = {}, mapNodeId = 0;
 let mapColX = [], mapColWidths = [], mapRange = null; // saved for timeline→map navigation
 let connectFromId = null, detailTopicId = null;
 // Which projects are hidden from the map, per board — a personal, per-session display filter
@@ -1878,14 +1878,14 @@ function positionNewNode(m, newTopic, referenceNodeId) {
         const curY = mapNodePositions[n.id] != null ? mapNodePositions[n.id].y : n.manualY;
         if (curY != null && curY >= targetY) {
           if (n.manualX == null && mapNodePositions[n.id]) n.manualX = mapNodePositions[n.id].x;
-          n.manualY = curY + estH + ROW_GAP;
+          n.manualY = curY + estH + ROW_GAP - (mapNodePositions[n.id] ? (mapNodeLaneTop[n.id] || 0) : 0);
         }
       }
       if (n.children && n.children.length) shiftBelow(n.children);
     }
   }
   shiftBelow(m.topics);
-  newTopic.manualY = targetY;
+  newTopic.manualY = targetY - (mapNodeLaneTop[referenceNodeId] || 0);
 }
 
 // All three buttons attach the new entry to whatever is currently selected (the anchor) —
@@ -2675,8 +2675,8 @@ function mapUpdate(source) {
     const laneTop = laneCursor;
     const laneHeight = pr.data.collapsed ? collapsedLaneHeight : Math.max(Math.max(topMargin, ...colY), minLaneHeight);
     topics.forEach(d => { d.x += laneTop; });
-    // manualY is a screen coordinate; pin those nodes back after += laneTop to avoid double-applying the offset.
-    topics.forEach(d => { if (d.data.nodeRef?.manualY != null) d.x = d.data.nodeRef.manualY; });
+    mapNodeLaneTop[pr.data.id] = laneTop;
+    topics.forEach(d => { mapNodeLaneTop[d.data.id] = laneTop; });
     const topicXs = topics.map(d => d.x);
     pr.y = 150;
     // A collapsed (or still-empty) lane has no topics to center on, so it falls back to the
@@ -3357,7 +3357,7 @@ function topicDragBehavior() {
       const dragNodeId = d.data.nodeRef.id;
       const curM = activeMember(); if (!curM) return;
       const curNode = findNode(curM, dragNodeId); if (!curNode) return;
-      curNode.manualY = curX;
+      curNode.manualY = curX - (mapNodeLaneTop[d.data.id] || 0);
       curNode.manualX = curY;
       if (canEditBoard()) save(); // persists to Firestore (admin or own board)
       buildD3Map(); // always rebuild to apply the new position immediately
