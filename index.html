@@ -2673,15 +2673,10 @@ function mapUpdate(source) {
     const topics = pr.descendants().filter(d => d.data.type === 'topic');
     topics.forEach(d => layoutTopic(d, colY));
     const laneTop = laneCursor;
+    const laneHeight = pr.data.collapsed ? collapsedLaneHeight : Math.max(Math.max(topMargin, ...colY), minLaneHeight);
     topics.forEach(d => { d.x += laneTop; });
     // manualY is a screen coordinate; pin those nodes back after += laneTop to avoid double-applying the offset.
     topics.forEach(d => { if (d.data.nodeRef?.manualY != null) d.x = d.data.nodeRef.manualY; });
-    // Compute laneHeight from the corrected d.x positions so the lane band and plotHeight
-    // track where nodes actually are, not the colY values inflated by screen coordinates.
-    const laneHeight = pr.data.collapsed ? collapsedLaneHeight : Math.max(
-      topMargin, minLaneHeight,
-      ...topics.map(d => (d.x - laneTop) + (d.cellHeight || 0) / 2 + rowGap)
-    );
     const topicXs = topics.map(d => d.x);
     pr.y = 150;
     // A collapsed (or still-empty) lane has no topics to center on, so it falls back to the
