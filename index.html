@@ -1182,7 +1182,7 @@ async function handleAuthChange(user) {
   }
   viewMemberId = user.uid;
   unsubscribeMembers = window.fbOnSnapshot(window.fbCollection('members'), snapshot => {
-    data.members = snapshot.docs.map(d => d.data());
+    data.members = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
     const me = data.members.find(x => x.id === myMemberId());
     realIsAdmin = !!(me && me.isAdmin);
     applyAdminPreview();
@@ -1220,8 +1220,7 @@ const activeMember = () => data.members.find(m => m.id === viewMemberId) || null
 function reconcileViewAfterDataChange() {
   if (viewMemberId && data.members.some(m => m.id === viewMemberId)) return;
   const mine = myMemberId();
-  viewMemberId = (mine && data.members.some(m => m.id === mine)) ? mine : (data.members[0] ? data.members[0].id : null);
-}
+  viewMemberId = (mine && data.members.some(m => m.id === mine)) ? mine : (data.members[0] ? data.members[0].id : null);}
 const todayStr = () => new Date().toISOString().slice(0, 10);
 // toISOString() converts to UTC first, which can shift a local calendar date across the
 // midnight boundary — fine for todayStr() above (that's the existing convention here), but
