@@ -68,6 +68,23 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .member-tab-name{font-size:10px;font-weight:700;color:#374151;word-break:break-word;line-height:1.25;max-width:100%}
 .member-tab-lock{position:absolute;top:4px;right:8px;font-size:10px}
 .member-tab-review{font-size:7.5px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:#92400e;background:#fef3c7;border:1px solid #fbbf24;border-radius:5px;padding:1px 5px;white-space:nowrap}
+.member-tab-stars{font-size:10px;font-weight:800;color:#b45309}
+.member-tab-star-note{font-size:7.5px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:#78350f;background:#fde68a;border:1px solid #f59e0b;border-radius:5px;padding:1px 5px;white-space:nowrap;cursor:pointer}
+.member-tab-star-note:hover{background:#fcd34d}
+.star-btn-row{display:flex;gap:6px;margin-top:6px}
+.star-btn{flex:1;padding:7px 8px;border-radius:8px;border:1.5px solid #f59e0b;background:#fffbeb;color:#92400e;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+.star-btn:hover{background:#fef3c7}
+.star-sub{margin-top:8px;padding:10px;border-radius:8px;background:#fffbeb;border:1px solid #fcd34d;display:flex;flex-direction:column;gap:7px}
+.star-sub-title{font-size:11px;font-weight:700;color:#92400e}
+.star-input{width:100%;padding:7px 9px;border:1.5px solid #e5e7eb;border-radius:7px;font-size:12px;font-family:inherit;outline:none;background:#fff;color:#1e293b}
+.star-input:focus{border-color:#f59e0b}
+.star-sub-actions{display:flex;justify-content:flex-end;gap:6px}
+.star-status{margin-top:6px;padding:8px 10px;border-radius:8px;background:#fffbeb;border:1px solid #fcd34d;font-size:11.5px;color:#78350f;line-height:1.45}
+.star-task{margin:8px 0;padding:9px 11px;border-radius:8px;background:#fffbeb;border:1px solid #fcd34d;font-size:13px;font-weight:700;color:#78350f}
+.star-hint{font-size:11px;color:#6b7280;margin-top:6px}
+.topic-box.star-glow{filter:drop-shadow(0 0 5px #fbbf24) drop-shadow(0 0 10px rgba(251,191,36,.65));animation:starPulse 2.4s ease-in-out infinite}
+@keyframes starPulse{0%,100%{filter:drop-shadow(0 0 4px #fbbf24) drop-shadow(0 0 8px rgba(251,191,36,.5))}50%{filter:drop-shadow(0 0 9px #fbbf24) drop-shadow(0 0 18px rgba(251,191,36,.85))}}
+@media (prefers-reduced-motion:reduce){.topic-box.star-glow{animation:none}}
 .member-avatar-edit{position:absolute;top:32px;left:50%;transform:translateX(6px);width:18px;height:18px;border-radius:50%;background:#7c3aed;color:#fff;border:1.5px solid #fff;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
 .member-avatar-edit:hover{background:#6d28d9}
 .member-sidebar-empty{font-size:10.5px;color:#9ca3af;text-align:center;padding:10px 4px}
@@ -443,6 +460,14 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
     <div class="modal-footer">
       <button class="btn btn-save" onclick="closeConnectModal()">Done</button>
     </div>
+  </div>
+</div>
+
+<div class="overlay" id="ov-star-inbox">
+  <div class="modal">
+    <h3 id="star-inbox-title">⭐ Star</h3>
+    <div id="star-inbox-body"></div>
+    <div class="modal-footer" id="star-inbox-footer"></div>
   </div>
 </div>
 
@@ -1164,6 +1189,8 @@ function handleSignOut() { window.fbSignOut(); }
 async function handleAuthChange(user) {
   firebaseUser = user;
   if (unsubscribeMembers) { unsubscribeMembers(); unsubscribeMembers = null; }
+  if (unsubscribeStars) { unsubscribeStars(); unsubscribeStars = null; }
+  starsList = [];
   if (!user) {
     data.members = []; viewMemberId = null; realIsAdmin = false; adminPreviewAsRegular = false; applyAdminPreview();
     showLoginScreen();
@@ -1209,6 +1236,14 @@ async function handleAuthChange(user) {
       if (!viewMemberId || changedIds.has(viewMemberId)) renderAll();
     }
   }, err => console.error('members listener error', err));
+  unsubscribeStars = window.fbOnSnapshot(window.fbCollection('stars'), snapshot => {
+    starsList = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+    renderMemberSidebar();
+    if (snapshot.metadata.hasPendingWrites || !activeMember()) return;
+    buildD3Map();
+    const open = detailTopicId && document.getElementById('detail-panel').classList.contains('open');
+    if (open) { const n = findNode(activeMember(), detailTopicId); if (n) showTopicDetail(n); }
+  }, err => console.warn('stars listener error (are the Firestore rules for "stars" added?)', err));
 }
 window.addEventListener('auth-changed', e => handleAuthChange(e.detail));
 
@@ -2153,7 +2188,8 @@ function showTopicDetail(n) {
     <div class="d-date">${n.date ? ('🗓 ' + formatDate(n.date)) : 'No date set'} · Week ${wk.weekNum} (${formatWeekRange(wk.weekStart, wk.weekEnd)})</div>
     <div class="d-created">🕒 Created ${formatTimestamp(n.createdAt)}</div>
     <div class="d-section">Description</div>
-    ${bulletsHtml}`;
+    ${bulletsHtml}
+    ${starSectionHtml(n)}`;
   const parentNode = findParentNode(m, n.id);
   if (parentNode) {
     html += `<div class="d-section">Connected from</div>
@@ -2264,6 +2300,155 @@ function reorderTopicBullets(nodeId, fromIdx, toIdx) {
   bullets.splice(toIdx, 0, item);
   save();
   showTopicDetail(findNode(activeMember(), nodeId));
+}
+
+// ── STARS ───────────────────────────────────────────────────────────────
+// A star is one record in the shared `stars` collection (so a member never has to write to
+// another member's board). type 'assign': the giver credits a teammate for help on the giver's
+// node — the teammate then places a gold floating copy into one of their projects.
+// type 'ask': the giver did the work and asks a teammate to approve a star for it.
+let starsList = [];
+let unsubscribeStars = null;
+const GOLD = { fill: '#fbbf24', stroke: '#d97706', text: '#451a03' };
+function starIsActive(s) { return s.type === 'assign' || s.status === 'pending' || s.status === 'approved'; }
+function starsForNode(nodeId, fromId) { return starsList.filter(s => s.nodeId === nodeId && s.fromId === fromId && starIsActive(s)); }
+function nodeIsGold(n, ownerId) {
+  if (!n) return false;
+  if (n.starFrom) return true;
+  return starsForNode(n.id, ownerId).some(s => s.type === 'assign' || s.status === 'approved');
+}
+function starCount(memberId) {
+  return starsList.filter(s => (s.type === 'assign' && s.toId === memberId) || (s.type === 'ask' && s.fromId === memberId && s.status === 'approved')).length;
+}
+function starsIncoming(kind) {
+  const me = myMemberId();
+  return me ? starsList.filter(s => s.toId === me && s.type === kind && s.status === 'pending') : [];
+}
+function starSectionHtml(n) {
+  const m = activeMember(); if (!m) return '';
+  let body = '';
+  if (n.starFrom) {
+    body = `<div class="star-status">⭐ Star from <b>${escapeHtml(n.starFrom.fromName)}</b>${n.starFrom.note ? ' — ' + escapeHtml(n.starFrom.note) : ''}</div>`;
+    if (isMyBoard() && m.projects.length > 1) {
+      body += `<div class="star-btn-row"><button class="star-btn" type="button" onclick="openStarMovePanel('${n.id}')">📁 Move to another project</button></div><div id="star-sub"></div>`;
+    }
+  } else {
+    const s = starsForNode(n.id, m.id)[0];
+    if (s && s.type === 'assign') body = `<div class="star-status">⭐ Star assigned to <b>${escapeHtml(s.toName)}</b></div>`;
+    else if (s && s.status === 'approved') body = `<div class="star-status">⭐ Star approved by <b>${escapeHtml(s.toName)}</b></div>`;
+    else if (s) body = `<div class="star-status">⏳ Star requested from <b>${escapeHtml(s.toName)}</b> — waiting for approval</div>`;
+    else if (isMyBoard()) body = `<div class="star-btn-row">
+        <button class="star-btn" type="button" onclick="openStarPanel('${n.id}','assign')">⭐ Assign star to member</button>
+        <button class="star-btn" type="button" onclick="openStarPanel('${n.id}','ask')">🙋 Request a star</button>
+      </div><div id="star-sub"></div>`;
+    else return '';
+  }
+  return `<div class="d-section">Stars</div>${body}`;
+}
+function openStarPanel(nodeId, mode) {
+  const sub = document.getElementById('star-sub'); if (!sub) return;
+  const me = myMemberId();
+  const others = data.members.filter(x => x.id !== me && isMemberCurrent(x));
+  if (!others.length) { sub.innerHTML = '<div class="star-hint">No other team members yet.</div>'; return; }
+  sub.innerHTML = `<div class="star-sub">
+    <div class="star-sub-title">${mode === 'assign' ? 'Assign this star to' : 'Ask for a star from'}</div>
+    <select id="star-member" class="star-input">${others.map(x => `<option value="${x.id}">${escapeHtml(x.name)}</option>`).join('')}</select>
+    <input id="star-note" class="star-input" maxlength="140" placeholder="${mode === 'assign' ? 'What did they help with? (optional)' : 'What did you do? (optional)'}">
+    <div class="star-sub-actions">
+      <button class="btn btn-dismiss" type="button" onclick="document.getElementById('star-sub').innerHTML=''">Cancel</button>
+      <button class="btn btn-save" type="button" onclick="confirmStar('${nodeId}','${mode}')">Done</button>
+    </div></div>`;
+}
+async function confirmStar(nodeId, mode) {
+  const m = activeMember(); if (!m || !isMyBoard()) return;
+  const n = findNode(m, nodeId); if (!n) return;
+  const to = data.members.find(x => x.id === document.getElementById('star-member').value); if (!to) return;
+  const s = {
+    id: genId(), type: mode, fromId: m.id, fromName: m.name, toId: to.id, toName: to.name,
+    nodeId, nodeText: n.text, nodeKind: n.kind || 'sub', bullets: (n.bullets || []).filter(b => b && b.trim()),
+    note: document.getElementById('star-note').value.trim(), status: 'pending', createdAt: Date.now()
+  };
+  starsList.push(s);
+  buildD3Map(); showTopicDetail(findNode(activeMember(), nodeId));
+  try { await window.fbSetDoc(window.fbDoc('stars', s.id), s); }
+  catch (e) {
+    console.error('Star write failed', e);
+    starsList = starsList.filter(x => x.id !== s.id);
+    buildD3Map(); showTopicDetail(findNode(activeMember(), nodeId));
+    alert('Could not save the star — check your connection and permissions.');
+  }
+}
+function closeStarInbox() { document.getElementById('ov-star-inbox').classList.remove('open'); }
+function openStarInbox(kind) {
+  const list = starsIncoming(kind);
+  if (!list.length) { closeStarInbox(); return; }
+  const s = list[0];
+  const me = data.members.find(x => x.id === myMemberId()); if (!me) return;
+  const task = `<div class="star-task">${escapeHtml(s.nodeText)}</div>${s.note ? `<div class="star-hint">“${escapeHtml(s.note)}”</div>` : ''}`;
+  const more = list.length > 1 ? `<div class="star-hint">${list.length - 1} more waiting after this one.</div>` : '';
+  document.getElementById('star-inbox-title').textContent = kind === 'assign' ? '⭐ You received a star' : '🙋 Star request';
+  if (kind === 'assign') {
+    document.getElementById('star-inbox-body').innerHTML = `<div><b>${escapeHtml(s.fromName)}</b> gave you a star for helping with:</div>${task}
+      <div class="fg"><label>Which project should it be added to?</label>
+      <select id="star-proj" class="star-input">${me.projects.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')}</select></div>
+      <div class="star-hint">It lands in this week as a free-floating gold node — connect it to any of your nodes later.</div>${more}`;
+    document.getElementById('star-inbox-footer').innerHTML = `<button class="btn btn-dismiss" onclick="closeStarInbox()">Later</button>
+      <button class="btn btn-save" onclick="placeStar('${s.id}')">Add to project</button>`;
+  } else {
+    document.getElementById('star-inbox-body').innerHTML = `<div><b>${escapeHtml(s.fromName)}</b> is asking you to approve a star for:</div>${task}${more}`;
+    document.getElementById('star-inbox-footer').innerHTML = `<button class="btn btn-dismiss" onclick="decideStar('${s.id}',false)">Decline</button>
+      <button class="btn btn-save" onclick="decideStar('${s.id}',true)">Approve star</button>`;
+  }
+  document.getElementById('ov-star-inbox').classList.add('open');
+}
+async function placeStar(starId) {
+  const s = starsList.find(x => x.id === starId); if (!s) return;
+  const me = myMemberId();
+  const m = data.members.find(x => x.id === me); if (!m) return;
+  const projId = document.getElementById('star-proj').value;
+  if (viewMemberId !== me) switchViewMember(me);
+  const node = {
+    id: genId(), text: s.nodeText, date: todayStr(), kind: s.nodeKind || 'sub', bullets: (s.bullets || []).slice(),
+    createdAt: Date.now(), children: [], standalone: true, projectId: projId,
+    starFrom: { fromId: s.fromId, fromName: s.fromName, note: s.note || '', starId: s.id }
+  };
+  m.topics.push(node);
+  s.status = 'placed'; s.placedAt = Date.now(); s.placedNodeId = node.id;
+  save(); buildD3Map(); renderMemberSidebar();
+  showTopicDetail(node);
+  try { await window.fbSetDoc(window.fbDoc('stars', s.id), s); }
+  catch (e) { console.error('Star update failed', e); }
+  if (starsIncoming('assign').length) openStarInbox('assign'); else closeStarInbox();
+}
+function openStarMovePanel(nodeId) {
+  const m = activeMember(), sub = document.getElementById('star-sub'); if (!m || !sub) return;
+  const n = findNode(m, nodeId); if (!n) return;
+  sub.innerHTML = `<div class="star-sub">
+    <div class="star-sub-title">Move this star to project</div>
+    <select id="star-move-proj" class="star-input">${m.projects.map(p => `<option value="${p.id}"${p.id === n.projectId ? ' selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}</select>
+    <div class="star-sub-actions">
+      <button class="btn btn-dismiss" type="button" onclick="document.getElementById('star-sub').innerHTML=''">Cancel</button>
+      <button class="btn btn-save" type="button" onclick="moveStarNode('${nodeId}')">Done</button>
+    </div></div>`;
+}
+function moveStarNode(nodeId) {
+  const m = activeMember(); if (!m || !isMyBoard()) return;
+  const n = findNode(m, nodeId); if (!n || !n.starFrom) return;
+  const projId = document.getElementById('star-move-proj').value;
+  if (!projId || (n.projectId === projId && n.standalone)) return;
+  reparentNode(nodeId, null, projId);
+  const moved = findNode(activeMember(), nodeId);
+  moved.standalone = true;
+  delete moved.manualY; delete moved.manualX;
+  save(); buildD3Map(); showTopicDetail(moved);
+}
+async function decideStar(starId, approve) {
+  const s = starsList.find(x => x.id === starId); if (!s) return;
+  s.status = approve ? 'approved' : 'declined'; s.decidedAt = Date.now();
+  renderMemberSidebar();
+  try { await window.fbSetDoc(window.fbDoc('stars', s.id), s); }
+  catch (e) { console.error('Star update failed', e); alert('Could not save your decision — check your connection and permissions.'); }
+  if (starsIncoming('ask').length) openStarInbox('ask'); else closeStarInbox();
 }
 
 function renderAll() {
@@ -2395,6 +2580,9 @@ function renderMemberSidebar() {
     return `<div class="member-tab${mm.id === viewMemberId ? ' active' : ''}" onclick="switchViewMember('${mm.id}')" title="${escapeHtml(mm.name)}${mm.id === myMemberId() ? ' (me)' : ''}">
       <div class="member-avatar" style="${avatarStyle}">${mm.avatar ? '' : escapeHtml(initials(mm.name))}</div>
       <span class="member-tab-name">${escapeHtml(truncate(mm.name, 12))}</span>
+      ${starCount(mm.id) ? `<span class="member-tab-stars" title="Stars received">⭐ ${starCount(mm.id)}</span>` : ''}
+      ${mm.id === myMemberId() && starsIncoming('assign').length ? `<span class="member-tab-star-note" onclick="event.stopPropagation();openStarInbox('assign')">${starsIncoming('assign').length} star${starsIncoming('assign').length > 1 ? 's' : ''} received</span>` : ''}
+      ${mm.id === myMemberId() && starsIncoming('ask').length ? `<span class="member-tab-star-note" onclick="event.stopPropagation();openStarInbox('ask')">${starsIncoming('ask').length} star request${starsIncoming('ask').length > 1 ? 's' : ''}</span>` : ''}
       ${isAdmin && memberNeedsReview(mm) ? '<span class="member-tab-review">Needs review</span>' : ''}
       ${mm.committedAt ? '<span class="member-tab-lock">🔒</span>' : ''}
       ${canPic ? `<button class="member-avatar-edit" onclick="toggleAvatarMenu(event, '${mm.id}')" title="Change profile picture">📷</button>` : ''}
@@ -2980,10 +3168,11 @@ function mapUpdate(source) {
     .attr('x', -3).attr('y', d => -d.cellHeight / 2 - 3).attr('width', d => d.cellWidth + 6).attr('height', d => d.cellHeight + 6);
   tE.append('path').attr('class', 'topic-box')
     .attr('d', d => cellShapePath(nodeKind(d), d.cellWidth, d.cellHeight))
-    .attr('fill', d => KIND_COLORS[nodeKind(d)].fill)
-    .attr('stroke', d => KIND_COLORS[nodeKind(d)].stroke).attr('stroke-width', 1.5);
+    .classed('star-glow', d => nodeIsGold(d.data.nodeRef, viewMemberId))
+    .attr('fill', d => (nodeIsGold(d.data.nodeRef, viewMemberId) ? GOLD : KIND_COLORS[nodeKind(d)]).fill)
+    .attr('stroke', d => (nodeIsGold(d.data.nodeRef, viewMemberId) ? GOLD : KIND_COLORS[nodeKind(d)]).stroke).attr('stroke-width', 1.5);
   tE.append('text').attr('class', 'editable-label').attr('font-size', '11').attr('font-weight', '700')
-    .attr('fill', d => KIND_COLORS[nodeKind(d)].text).style('cursor', 'text')
+    .attr('fill', d => (nodeIsGold(d.data.nodeRef, viewMemberId) ? GOLD : KIND_COLORS[nodeKind(d)]).text).style('cursor', 'text')
     .on('click', function (event, d) { editNodeName(event, d, d3.select(this.parentNode)); });
   // A 2x3 grid of dots (bigger and more numerous than a single glyph) plus a generous
   // invisible hit-area behind them, so the grab handle is easy to spot and easy to land on.
