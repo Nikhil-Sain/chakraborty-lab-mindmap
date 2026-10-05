@@ -2345,15 +2345,31 @@ function starSectionHtml(n) {
   }
   return `<div class="d-section">Stars</div>${body}`;
 }
+const STAR_NOTE_MAX_WORDS = 5;
+function starWords(text) { return text.split(/\s+/).filter(Boolean); }
+function limitStarNote(input) {
+  const w = starWords(input.value);
+  if (w.length > STAR_NOTE_MAX_WORDS) input.value = w.slice(0, STAR_NOTE_MAX_WORDS).join(' ');
+  const hint = document.getElementById('star-note-hint');
+  if (hint) { hint.textContent = `${Math.min(w.length, STAR_NOTE_MAX_WORDS)}/${STAR_NOTE_MAX_WORDS} words`; hint.style.color = ''; }
+}
+// Clicking the same button again collapses the open sub-panel; clicking the other one swaps to it.
+function toggleStarSub(sub, key) {
+  if (sub.dataset.mode === key && sub.innerHTML.trim()) { sub.innerHTML = ''; sub.dataset.mode = ''; return false; }
+  sub.dataset.mode = key;
+  return true;
+}
 function openStarPanel(nodeId, mode) {
   const sub = document.getElementById('star-sub'); if (!sub) return;
+  if (!toggleStarSub(sub, mode)) return;
   const me = myMemberId();
   const others = data.members.filter(x => x.id !== me && isMemberCurrent(x));
   if (!others.length) { sub.innerHTML = '<div class="star-hint">No other team members yet.</div>'; return; }
   sub.innerHTML = `<div class="star-sub">
     <div class="star-sub-title">${mode === 'assign' ? 'Assign this star to' : 'Ask for a star from'}</div>
     <select id="star-member" class="star-input">${others.map(x => `<option value="${x.id}">${escapeHtml(x.name)}</option>`).join('')}</select>
-    <input id="star-note" class="star-input" maxlength="140" placeholder="${mode === 'assign' ? 'What did they help with? (optional)' : 'What did you do? (optional)'}">
+    <input id="star-note" class="star-input" maxlength="80" oninput="limitStarNote(this)" placeholder="${mode === 'assign' ? 'What did they help with?' : 'What did you do?'}">
+    <div class="star-hint" id="star-note-hint" style="margin-top:0">Required · 0/${STAR_NOTE_MAX_WORDS} words</div>
     <div class="star-sub-actions">
       <button class="btn btn-dismiss" type="button" onclick="document.getElementById('star-sub').innerHTML=''">Cancel</button>
       <button class="btn btn-save" type="button" onclick="confirmStar('${nodeId}','${mode}')">Done</button>
@@ -2363,10 +2379,19 @@ async function confirmStar(nodeId, mode) {
   const m = activeMember(); if (!m || !isMyBoard()) return;
   const n = findNode(m, nodeId); if (!n) return;
   const to = data.members.find(x => x.id === document.getElementById('star-member').value); if (!to) return;
+  const noteInput = document.getElementById('star-note');
+  const nWords = starWords(noteInput.value).length;
+  if (nWords < 1 || nWords > STAR_NOTE_MAX_WORDS) {
+    const hint = document.getElementById('star-note-hint');
+    hint.textContent = nWords < 1 ? 'Please describe it in 1–5 words.' : `Please use at most ${STAR_NOTE_MAX_WORDS} words.`;
+    hint.style.color = '#b91c1c';
+    noteInput.focus();
+    return;
+  }
   const s = {
     id: genId(), type: mode, fromId: m.id, fromName: m.name, toId: to.id, toName: to.name,
     nodeId, nodeText: n.text, nodeKind: n.kind || 'sub', bullets: (n.bullets || []).filter(b => b && b.trim()),
-    note: document.getElementById('star-note').value.trim(), status: 'pending', createdAt: Date.now()
+    note: starWords(noteInput.value).join(' '), status: 'pending', createdAt: Date.now()
   };
   starsList.push(s);
   buildD3Map(); showTopicDetail(findNode(activeMember(), nodeId));
@@ -2423,6 +2448,7 @@ async function placeStar(starId) {
 function openStarMovePanel(nodeId) {
   const m = activeMember(), sub = document.getElementById('star-sub'); if (!m || !sub) return;
   const n = findNode(m, nodeId); if (!n) return;
+  if (!toggleStarSub(sub, 'move')) return;
   sub.innerHTML = `<div class="star-sub">
     <div class="star-sub-title">Move this star to project</div>
     <select id="star-move-proj" class="star-input">${m.projects.map(p => `<option value="${p.id}"${p.id === n.projectId ? ' selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}</select>
