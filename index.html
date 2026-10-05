@@ -82,6 +82,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .star-status{margin-top:6px;padding:8px 10px;border-radius:8px;background:#fffbeb;border:1px solid #fcd34d;font-size:11.5px;color:#78350f;line-height:1.45}
 .star-task{margin:8px 0;padding:9px 11px;border-radius:8px;background:#fffbeb;border:1px solid #fcd34d;font-size:13px;font-weight:700;color:#78350f}
 .star-hint{font-size:11px;color:#6b7280;margin-top:6px}
+.star-close{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:50%;border:none;background:#f3f4f6;color:#6b7280;font-size:12px;cursor:pointer;line-height:1;font-family:inherit}
+.star-close:hover{background:#e5e7eb;color:#111827}
 .member-avatar-edit{position:absolute;top:32px;left:50%;transform:translateX(6px);width:18px;height:18px;border-radius:50%;background:#7c3aed;color:#fff;border:1.5px solid #fff;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
 .member-avatar-edit:hover{background:#6d28d9}
 .member-sidebar-empty{font-size:10.5px;color:#9ca3af;text-align:center;padding:10px 4px}
@@ -463,7 +465,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 </div>
 
 <div class="overlay" id="ov-star-inbox">
-  <div class="modal">
+  <div class="modal" style="position:relative">
+    <button class="star-close" type="button" onclick="closeStarInbox()" title="Close" aria-label="Close">✕</button>
     <h3 id="star-inbox-title">⭐ Star</h3>
     <div id="star-inbox-body"></div>
     <div class="modal-footer" id="star-inbox-footer"></div>
@@ -2316,9 +2319,17 @@ function starIsActive(s) { return s.status !== 'removed' && (s.type === 'assign'
 function starsForNode(nodeId, fromId) { return starsList.filter(s => s.nodeId === nodeId && s.fromId === fromId && starIsActive(s)); }
 // What the corner badge on a node should show: a filled star once a star is given or
 // approved (or the node was received as one), a hollow star while a request awaits approval.
+// A received star-marked node only counts while its star record still exists (an admin or the
+// giver may have removed it since).
+function starFromAlive(n) {
+  if (!n || !n.starFrom) return false;
+  if (!starsLoaded) return true;
+  const sd = starsList.find(x => x.id === n.starFrom.starId);
+  return !!sd && sd.status !== 'removed';
+}
 function starBadgeInfo(n, ownerId) {
   if (!n) return null;
-  if (n.starFrom) return { filled: true, tip: `Star from ${n.starFrom.fromName}${n.starFrom.note ? ' — ' + n.starFrom.note : ''}` };
+  if (n.starFrom && starFromAlive(n)) return { filled: true, tip: `Star from ${n.starFrom.fromName}${n.starFrom.note ? ' — ' + n.starFrom.note : ''}` };
   const s = starsForNode(n.id, ownerId)[0];
   if (!s) return null;
   const note = s.note ? ' — ' + s.note : '';
@@ -2336,14 +2347,15 @@ function starsIncoming(kind) {
 function starSectionHtml(n) {
   const m = activeMember(); if (!m) return '';
   let body = '';
-  if (n.starFrom) {
+  if (n.starFrom && starFromAlive(n)) {
     body = `<div class="star-status">⭐ Star from <b>${escapeHtml(n.starFrom.fromName)}</b>${n.starFrom.note ? ' — ' + escapeHtml(n.starFrom.note) : ''}</div>`;
+    if (isAdmin) body += `<div class="star-btn-row"><button class="star-btn" type="button" onclick="removeStar('${n.starFrom.starId}')">🗑 Remove star</button></div>`;
     if (isMyBoard() && m.projects.length > 1) {
       body += `<div class="star-btn-row"><button class="star-btn" type="button" onclick="openStarMovePanel('${n.id}')">📁 Move to another project</button></div><div id="star-sub"></div>`;
     }
   } else {
     const s = starsForNode(n.id, m.id)[0];
-    const removeBtn = s && isMyBoard() && canEditNode(n)
+    const removeBtn = s && (isAdmin || (isMyBoard() && canEditNode(n)))
       ? `<div class="star-btn-row"><button class="star-btn" type="button" onclick="removeStar('${s.id}')">🗑 Remove star</button></div>` : '';
     if (s && s.type === 'assign') body = `<div class="star-status">⭐ Star assigned to <b>${escapeHtml(s.toName)}</b></div>${removeBtn}`;
     else if (s && s.status === 'approved') body = `<div class="star-status">⭐ Star approved by <b>${escapeHtml(s.toName)}</b></div>${removeBtn}`;
@@ -2416,12 +2428,14 @@ async function confirmStar(nodeId, mode) {
 }
 async function removeStar(starId) {
   const s = starsList.find(x => x.id === starId); if (!s) return;
-  const m = activeMember(); if (!m || !isMyBoard()) return;
-  const n = findNode(m, s.nodeId); if (n && !canEditNode(n)) return;
+  const m = activeMember(); if (!m) return;
+  const n = findNode(m, s.nodeId);
+  if (!isAdmin && !(isMyBoard() && s.fromId === m.id && (!n || canEditNode(n)))) return;
   if (!confirm(`Remove this star${s.type === 'assign' ? ' from ' + s.toName : ''}? It will disappear from their board and star count.`)) return;
   starsList = starsList.filter(x => x.id !== starId);
   renderMemberSidebar(); buildD3Map();
-  if (n) showTopicDetail(findNode(activeMember(), n.id));
+  const open = detailTopicId && document.getElementById('detail-panel').classList.contains('open');
+  if (open) { const dn = findNode(activeMember(), detailTopicId); if (dn) showTopicDetail(dn); }
   try { await window.fbDeleteDoc(window.fbDoc('stars', starId)); }
   catch (e) { console.error('Star delete failed', e); alert('Could not remove the star — check your connection and permissions.'); }
 }
