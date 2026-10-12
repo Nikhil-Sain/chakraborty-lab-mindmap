@@ -82,6 +82,12 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .star-status{margin-top:6px;padding:8px 10px;border-radius:8px;background:#fffbeb;border:1px solid #fcd34d;font-size:11.5px;color:#78350f;line-height:1.45}
 .star-task{margin:8px 0;padding:9px 11px;border-radius:8px;background:#fffbeb;border:1px solid #fcd34d;font-size:13px;font-weight:700;color:#78350f}
 .star-hint{font-size:11px;color:#6b7280;margin-top:6px}
+.star-req-list{max-height:60vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding-right:2px}
+.star-req{padding-bottom:12px;border-bottom:1px solid #f1f5f9}
+.star-req:last-child{border-bottom:none;padding-bottom:0}
+.star-req-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+.star-hist{margin-top:6px;display:flex;flex-direction:column;gap:3px;font-size:10.5px;color:#64748b}
+.star-hist-row{display:flex;justify-content:space-between;gap:8px}
 .star-close{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:50%;border:none;background:#f3f4f6;color:#6b7280;font-size:12px;cursor:pointer;line-height:1;font-family:inherit}
 .star-close:hover{background:#e5e7eb;color:#111827}
 .member-avatar-edit{position:absolute;top:32px;left:50%;transform:translateX(6px);width:18px;height:18px;border-radius:50%;background:#7c3aed;color:#fff;border:1.5px solid #fff;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
@@ -108,6 +114,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .btn-shape{border:none;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;color:#111;box-shadow:0 2px 6px rgba(0,0,0,.18)}
 .btn-shape:hover{filter:brightness(1.08)}
 .btn-shape:active{filter:brightness(.95)}
+.shape-star{padding:8px 22px;background:#fbbf24;font-size:12px;clip-path:polygon(0 50%,7% 0,50% 14%,93% 0,100% 50%,93% 100%,50% 86%,7% 100%)}
 .shape-node{padding:8px 20px;background:#22c55e;font-size:12px;clip-path:polygon(0 0,100% 0,86% 50%,100% 100%,0 100%,14% 50%)}
 .shape-subnode{padding:8px 16px;background:#3b82f6;font-size:12px;color:#fff;clip-path:polygon(12% 0,88% 0,100% 14%,100% 86%,88% 100%,12% 100%,0 86%,0 14%)}
 .shape-subsubnode{padding:8px 24px 8px 18px;background:#f97316;font-size:12px;color:#3d1a02;clip-path:polygon(22% 0,100% 0,78% 100%,0 100%)}
@@ -364,6 +371,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
     <button class="btn-shape shape-node" id="btn-add-node" onclick="addNodeOfType('node')" title="Add a top-level node under the current project">● Node</button>
     <button class="btn-shape shape-subnode" id="btn-add-sub" onclick="addNodeOfType('sub')" title="Add a child of the selected node">■ Sub Node</button>
     <button class="btn-shape shape-subsubnode" id="btn-add-subsub" onclick="addNodeOfType('subsub')" title="Add a grandchild of the selected node">◆ Micro Node</button>
+    <button class="btn-shape shape-star" id="btn-add-star" onclick="openAskStarDialog()" title="Add an Ask for star node to the Stars row and ask a teammate for a star">★ Ask for star</button>
     <button class="btn-toolbar" id="btn-filters" onclick="toggleFilterMenu(event)" title="Filter what's shown on the map">🔍 Filters</button>
     <button class="btn-toolbar" id="btn-commit" onclick="commitBoard()" title="Admin: lock in everything on this board so far — new entries can still be added afterward" style="display:none">✅ Commit</button>
     <button class="btn-toolbar" id="btn-undo" onclick="undo()" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
@@ -422,6 +430,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
       <label>Date</label>
       <input type="date" id="nm-date">
     </div>
+    <div class="fg" id="nm-proj-fg" style="display:none">
+      <label>Project</label>
+      <select id="nm-proj" class="star-input"></select>
+    </div>
     <div class="fg" id="nm-kind-fg" style="display:none">
       <label>Type</label>
       <div class="d-kind-row" id="nm-kind-row"></div>
@@ -470,6 +482,26 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
     <h3 id="star-inbox-title">⭐ Star</h3>
     <div id="star-inbox-body"></div>
     <div class="modal-footer" id="star-inbox-footer"></div>
+  </div>
+</div>
+
+<div class="overlay" id="ov-star-ask">
+  <div class="modal" style="position:relative">
+    <button class="star-close" type="button" onclick="closeAskStarDialog()" title="Close" aria-label="Close">✕</button>
+    <h3>🙋 Ask for a star</h3>
+    <div id="ask-behalf" class="star-hint" style="display:none;margin:-6px 0 10px"></div>
+    <div class="fg" id="ask-title-wrap"><label>What did you do? (node title)</label>
+      <input id="ask-title" maxlength="80" placeholder="e.g. Built timeline view" oninput="limitAskField(this, 'ask-title-hint')">
+      <div class="star-hint" id="ask-title-hint" style="margin-top:3px">Required · 0/5 words</div></div>
+    <div class="fg" id="ask-date-wrap"><label>Date</label>
+      <input type="date" id="ask-date"></div>
+    <div id="ask-existing" class="star-task" style="display:none"></div>
+    <div class="fg"><label>Ask for a star from</label><select id="ask-member" class="star-input" onchange="fillAskProjects()"></select></div>
+    <div class="fg"><label>Project name</label><select id="ask-project" class="star-input"></select></div>
+    <div class="modal-footer">
+      <button class="btn btn-dismiss" type="button" onclick="closeAskStarDialog()">Cancel</button>
+      <button class="btn btn-save" type="button" onclick="confirmAskStar()">Done</button>
+    </div>
   </div>
 </div>
 
@@ -605,9 +637,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
     </div>
     <div style="font-size:11px;color:#9ca3af;margin-bottom:10px" id="ac-effective-note"></div>
     <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:#374151;margin-bottom:14px;cursor:pointer">
-      <input type="checkbox" id="ac-apply-all">
+      <input type="checkbox" id="ac-apply-all" onchange="onApplyAllToggle()">
       Apply to all members instead of just this one
     </label>
+    <div id="ac-applied-note" style="font-size:11px;color:#059669;font-weight:600;margin:-8px 0 12px"></div>
     <div class="modal-footer">
       <button class="btn btn-save" onclick="closeAdminControls()">Done</button>
     </div>
@@ -715,8 +748,37 @@ const ARROW_SHAPE = 'M-6,-4.5 L6,0 L-6,4.5 Z';
 const KIND_COLORS = {
   node:   { fill: '#22c55e', stroke: '#16a34a', text: '#052e11' },
   sub:    { fill: '#3b82f6', stroke: '#2563eb', text: '#ffffff' },
-  subsub: { fill: '#f97316', stroke: '#ea580c', text: '#3d1a02' }
+  subsub: { fill: '#f97316', stroke: '#ea580c', text: '#3d1a02' },
+  star:   { fill: '#fbbf24', stroke: '#d97706', text: '#111' }
 };
+// The Stars row is a fixed, always-last lane (never stored in m.projects) — nodes living in it
+// just carry this as their projectId.
+const STAR_LANE_ID = '__stars__';
+const RANDOM_WORK_ID = '__random__';
+// The red copy of an approved Ask-for-star node that appears, floating, in the approver's project.
+const STAR_COPY_COLORS = { fill: '#ef4444', stroke: '#b91c1c', text: '#fff' };
+function nodePalette(d) { return d.data.nodeRef && d.data.nodeRef.starCopy ? STAR_COPY_COLORS : KIND_COLORS[nodeKind(d)]; }
+let hideStarNodes = {};
+function isStarNodesHidden(memberId) { return !!hideStarNodes[memberId]; }
+const isStarDerived = t => !!(t.starFrom || t.starCopy);
+// Your own board, or any board if you're admin (admin acts on behalf of that board's member).
+function canGiveStar() { return isMyBoard() || isAdmin; }
+function starHistoryHtml(s) {
+  if (!s) return '';
+  const row = (label, ts, extra) => `<div class="star-hist-row"><span>${label}</span><span>${ts ? escapeHtml(formatTimestamp(ts)) : '—'}${extra || ''}</span></div>`;
+  const byAdmin = s.byAdmin ? ' · by admin' : '';
+  let rows;
+  if (s.type === 'assign') {
+    rows = row('⭐ Assigned', s.createdAt, byAdmin) + (s.status === 'placed' ? row('✓ Accepted', s.placedAt) : row('⏳ Accepted', null));
+  } else {
+    rows = row('🙋 Requested', s.createdAt, byAdmin)
+      + (s.status === 'approved' ? row(s.approvedBy === 'admin' ? '✓ Approved (by admin)' : '✓ Approved', s.decidedAt)
+        : s.status === 'declined' ? row('✕ Declined', s.decidedAt) : row('⏳ Approved', null));
+  }
+  return `<div class="star-hist">${rows}</div>`;
+}
+function nodeProjectId(m, nodeId) { const r = collectProjectNodes(m).find(x => x.node.id === nodeId); return r ? r.projectId : null; }
+function inStarRow(m, nodeId) { return nodeProjectId(m, nodeId) === STAR_LANE_ID; }
 let data = { members: [] };
 // ── IDENTITY & PERMISSIONS ──────────────────────────────────────────────
 // Identity now comes from a real Firebase login — myMemberId() is just the signed-in
@@ -1669,7 +1731,13 @@ function renderFilterMenu() {
   const m = activeMember();
   if (!m || !(m.projects || []).length) { menu.innerHTML = '<div class="filter-menu-empty">No projects yet</div>'; return; }
   const anyHidden = m.projects.some(p => isProjectHidden(m.id, p.id));
-  const sectionHeader = `<div class="filter-menu-section"><span>Projects</span>${anyHidden ? `<button class="filter-menu-selectall" onclick="showAllProjects('${m.id}')">Select all</button>` : ''}</div>`;
+  const sectionHeader = `<div class="filter-menu-section"><span>Projects</span></div>
+    <label class="filter-menu-row"><input type="checkbox" ${anyHidden ? '' : 'checked'} onchange="toggleAllProjects('${m.id}')"><span class="filter-menu-name"><b>Select all</b></span></label>`;
+  const starNodeCount = m.topics.filter(t => t.projectId !== STAR_LANE_ID && isStarDerived(t)).length;
+  const starSection = `<div class="filter-menu-section"><span>Star nodes</span></div>
+    <label class="filter-menu-row" title="Show or hide the star nodes that appear in your projects">
+      <input type="checkbox" ${isStarNodesHidden(m.id) ? '' : 'checked'} onchange="toggleStarNodes('${m.id}')">
+      <span class="filter-menu-name">Show star nodes</span><span class="filter-menu-count">${starNodeCount}</span></label>`;
   menu.innerHTML = sectionHeader + m.projects.map(p => {
     const count = countTopics(m.topics.filter(t => t.projectId === p.id));
     const checked = !isProjectHidden(m.id, p.id);
@@ -1681,7 +1749,19 @@ function renderFilterMenu() {
       <span class="filter-menu-name">${escapeHtml(p.name)}</span>
       <span class="filter-menu-count">${count}</span>
     </label>`;
-  }).join('');
+  }).join('') + starSection;
+}
+function toggleAllProjects(memberId) {
+  const m = data.members.find(x => x.id === memberId); if (!m) return;
+  if (m.projects.some(p => isProjectHidden(memberId, p.id))) { showAllProjects(memberId); return; }
+  hiddenProjectIds[memberId] = new Set(m.projects.map(p => p.id));
+  renderFilterMenu();
+  if (mapRoot) buildD3Map();
+}
+function toggleStarNodes(memberId) {
+  hideStarNodes[memberId] = !hideStarNodes[memberId];
+  renderFilterMenu();
+  if (mapRoot) buildD3Map();
 }
 function toggleFilterMenu(event) {
   event.stopPropagation();
@@ -1738,6 +1818,7 @@ function openAdminControls() {
   document.getElementById('admin-menu').classList.remove('open');
   document.getElementById('ac-title').textContent = `📅 Data entry controls — ${m.name}`;
   document.getElementById('ac-apply-all').checked = false; // never carry this over between openings
+  document.getElementById('ac-applied-note').textContent = '';
   renderAdminControls();
   document.getElementById('ov-admin-controls').classList.add('open');
 }
@@ -1780,13 +1861,28 @@ function updateCustomDateRestriction() {
 function applyDateRestrictionPatch(patch) {
   const m = activeMember(); if (!m || !isAdmin) return;
   const applyAll = document.getElementById('ac-apply-all').checked;
+  const note = document.getElementById('ac-applied-note');
   if (applyAll) {
     data.members.forEach(mem => { mem.dateRestriction = { ...patch }; pushMemberToFirestore(mem); });
+    note.textContent = `✓ Applied to all ${data.members.length} members`;
   } else {
     m.dateRestriction = patch;
     save();
+    note.textContent = '';
   }
   renderAdminControls();
+}
+// Ticking "Apply to all" pushes this board's current setting to every member right away
+// (after a confirmation) — the box used to do nothing until a mode button was clicked again.
+const DATE_MODE_LABELS = { thisAndNextWeek: 'This week and next week', none: 'No restriction — any date', sinceCommit: 'From their last commit onward', custom: 'Custom range' };
+function onApplyAllToggle() {
+  const box = document.getElementById('ac-apply-all');
+  const note = document.getElementById('ac-applied-note');
+  if (!box.checked) { note.textContent = ''; return; }
+  const m = activeMember(); if (!m || !isAdmin) { box.checked = false; return; }
+  const dr = m.dateRestriction || { mode: 'thisAndNextWeek' };
+  if (!confirm(`Apply "${DATE_MODE_LABELS[dr.mode] || dr.mode}" to all ${data.members.length} members?`)) { box.checked = false; return; }
+  applyDateRestrictionPatch({ mode: dr.mode, start: dr.start || null, end: dr.end || null });
 }
 
 // ── NODES ────────────────────────────────────────────────────────────────
@@ -1852,8 +1948,15 @@ function openNodeModal(title, initialText, initialDate, cb, kindNode) {
   dateInput.min = bounds.min || '';
   dateInput.max = bounds.max || '';
   nodeModalCallback = cb;
+  const projFg = document.getElementById('nm-proj-fg');
+  if (kindNode && kindNode.starFrom && isMyBoard()) {
+    const mm = activeMember(), cur = nodeProjectId(mm, kindNode.id);
+    document.getElementById('nm-proj').innerHTML = mm.projects.map(p => `<option value="${p.id}"${p.id === cur ? ' selected' : ''}>${escapeHtml(p.name)}</option>`).join('')
+      + `<option value="${STAR_LANE_ID}"${cur === STAR_LANE_ID ? ' selected' : ''}>⭐ Stars row</option>`;
+    projFg.style.display = '';
+  } else projFg.style.display = 'none';
   const kindFg = document.getElementById('nm-kind-fg');
-  if (kindNode) { kindFg.style.display = ''; renderKindRow(kindNode.id, kindNode.kind); }
+  if (kindNode && !kindNode.starCopy && kindNode.kind !== 'star') { kindFg.style.display = ''; renderKindRow(kindNode.id, kindNode.kind); }
   else kindFg.style.display = 'none';
   document.getElementById('ov-node').classList.add('open');
   setTimeout(() => document.getElementById('nm-text').focus(), 50);
@@ -1972,8 +2075,12 @@ function renameNode(id) {
     // a different week, that stale position has to be cleared (not just left stale) or the
     // node keeps rendering in its old column regardless of what the date now says.
     if (weekOfYear(cur.date).absIdx !== oldWeek) { delete cur.manualY; delete cur.manualX; }
+    if (cur.starFrom) {
+      const pv = document.getElementById('nm-proj').value;
+      if (pv && pv !== nodeProjectId(activeMember(), cur.id)) applyStarProject(cur.id, pv);
+    }
     save(); buildD3Map();
-    if (detailTopicId === id) showTopicDetail(cur);
+    if (detailTopicId === id) showTopicDetail(findNode(activeMember(), id));
   }, node);
 }
 // Switches a node between Node / Sub Node / Micro Node — only its shape/color/size
@@ -1981,6 +2088,7 @@ function renameNode(id) {
 function setNodeKind(id, kind) {
   if (!KIND_LABEL[kind]) return;
   const node = findNode(activeMember(), id); if (!node || node.kind === kind || !canEditNode(node)) return;
+  if (node.kind === 'star' || node.starCopy) return;
   node.kind = kind;
   save(); buildD3Map();
   if (detailTopicId === id) showTopicDetail(node);
@@ -2057,6 +2165,11 @@ function renderConnectList() {
   const m = activeMember(); if (!m) return;
   const q = document.getElementById('connect-search').value.toLowerCase();
   let all = allTopicNodes(m.topics, []).filter(n => n.id !== connectFromId && (!q || n.text.toLowerCase().includes(q)));
+  const fromStarRow = connectFromId && inStarRow(m, connectFromId);
+  if (fromStarRow) {
+    const starRowIds = new Set(collectProjectNodes(m).filter(r => r.projectId === STAR_LANE_ID).map(r => r.node.id));
+    all = all.filter(n => starRowIds.has(n.id));
+  }
   const list = document.getElementById('connect-list');
   list.innerHTML = all.map(n => {
     const connected = m.connections.some(c => (c.a === connectFromId && c.b === n.id) || (c.a === n.id && c.b === connectFromId));
@@ -2065,7 +2178,7 @@ function renderConnectList() {
       <span>${escapeHtml(truncate(n.text, 38))}${n.date ? ' · ' + formatDate(n.date) : ''}</span>
       ${connected ? '<span class="ctick">✓ linked</span>' : ''}
     </div>`;
-  }).join('') || `<div style="padding:14px;text-align:center;color:#9ca3af;font-size:12px">No other topics yet.</div>`;
+  }).join('') || `<div style="padding:14px;text-align:center;color:#9ca3af;font-size:12px">${fromStarRow ? 'No other nodes in the Stars row yet.' : 'No other topics yet.'}</div>`;
 }
 function toggleConnectRow(id) {
   if (!canEditBoard()) return;
@@ -2091,6 +2204,17 @@ function closeDetail() {
 function showRootDetail(m, projectId) {
   detailTopicId = null;
   document.getElementById('node-actions').classList.remove('visible');
+  if (projectId === STAR_LANE_ID) {
+    document.getElementById('detail-panel').classList.add('open');
+    const sc = countTopics(m.topics.filter(t => t.projectId === STAR_LANE_ID));
+    document.getElementById('detail-content').innerHTML = `
+      <div class="d-title">⭐ Stars</div>
+      <div class="d-date">👤 ${escapeHtml(m.name)} · ${sc} node${sc !== 1 ? 's' : ''} in this row</div>
+      <div class="d-section">About this row</div>
+      <div style="font-size:11.5px;color:#475569;line-height:1.55">A dedicated row for star nodes, always at the bottom. Select a star node here to add nodes, sub-nodes or more star nodes under it. Use the ★ Ask for star button in the toolbar to ask a teammate for a star for something you did; received stars can be placed here too.</div>`;
+    resizeMapForPanel();
+    return;
+  }
   const p = m.projects.find(pr => pr.id === projectId); if (!p) return;
   document.getElementById('detail-panel').classList.add('open');
   const count = countTopics(m.topics.filter(t => t.projectId === p.id));
@@ -2107,7 +2231,7 @@ function showRootDetail(m, projectId) {
     return `
       <div class="bullet-row">
         <span class="bullet-mark">•</span>
-        <textarea class="bullet-textarea pd-textarea" data-idx="${i}" rows="1" placeholder="Type a point…" oninput="autoGrowTextarea(this); updateProjectPoint('${p.id}', ${i}, this.value)"${canEditPoint ? '' : ' readonly'}>${escapeHtml(pt.text)}</textarea>
+        <textarea class="bullet-textarea pd-textarea" data-idx="${i}" rows="1" placeholder="Type a point…" title="Max ${BULLET_MAX_WORDS} words" oninput="applyWordCap(this, BULLET_MAX_WORDS); autoGrowTextarea(this); updateProjectPoint('${p.id}', ${i}, this.value)"${canEditPoint ? '' : ' readonly'}>${escapeHtml(pt.text)}</textarea>
         ${canEditPoint ? `<span class="pd-remove" onclick="removeProjectPoint('${p.id}', ${i})" title="Remove this point">✕</span>` : ''}
       </div>`;
   }).join('');
@@ -2177,11 +2301,12 @@ function showTopicDetail(n) {
         ondrop="event.preventDefault();this.classList.remove('bullet-drag-over');var d=window._bDrag;if(d&&d.i!==${i})reorderTopicBullets(d.id,d.i,${i})">
         <span class="pd-drag-handle" title="Drag to reorder">⠿</span>
         <span class="bullet-mark" style="color:#818cf8">•</span>
-        <textarea class="bullet-textarea pd-textarea" draggable="false" data-idx="${i}" rows="1" placeholder="Type a point…" oninput="autoGrowTextarea(this); updateTopicBullet('${n.id}', ${i}, this.value)">${escapeHtml(b)}</textarea>
+        <textarea class="bullet-textarea pd-textarea" draggable="false" data-idx="${i}" rows="1" placeholder="Type a point…" title="Max ${BULLET_MAX_WORDS} words" oninput="applyWordCap(this, BULLET_MAX_WORDS); autoGrowTextarea(this); updateTopicBullet('${n.id}', ${i}, this.value)">${escapeHtml(b)}</textarea>
         <span class="pd-remove" onclick="removeTopicBullet('${n.id}', ${i})" title="Remove this point">✕</span>
       </div>`).join('');
     bulletsHtml = `<div class="bullet-list">${rows}</div>
-      <button class="pd-add" type="button" onclick="addTopicBullet('${n.id}')">+ Add description</button>`;
+      <button class="pd-add" type="button" onclick="addTopicBullet('${n.id}')">+ Add description</button>
+      <div class="bullet-hint">Max ${BULLET_MAX_WORDS} words per point</div>`;
   } else {
     const visible = allBullets.filter(b => b && b.trim());
     bulletsHtml = visible.length
@@ -2236,7 +2361,7 @@ function showTopicDetail(n) {
           <span style="color:#818cf8;font-size:10px;line-height:18px;flex-shrink:0">•</span>
           ${canEditPts
             ? `<textarea class="pd-textarea bp-textarea" rows="1" style="flex:1;font-size:10px;color:#374151;background:transparent;border:none;border-bottom:1px solid #e2e8f0;border-radius:0;padding:1px 2px;resize:none;font-family:inherit;outline:none"
-                oninput="autoGrowTextarea(this);updateBalloonPoint('${n.id}','${b.id}',${idx},this.value)">${escapeHtml(pt)}</textarea>
+                title="Max ${BULLET_MAX_WORDS} words" oninput="applyWordCap(this, BULLET_MAX_WORDS);autoGrowTextarea(this);updateBalloonPoint('${n.id}','${b.id}',${idx},this.value)">${escapeHtml(pt)}</textarea>
                <span class="pd-remove" onclick="removeBalloonPoint('${n.id}','${b.id}',${idx})" style="font-size:9px;padding:2px 0 0 4px;line-height:18px;flex-shrink:0">✕</span>`
             : `<span style="font-size:10px;color:#374151;line-height:1.5">${escapeHtml(pt)}</span>`
           }
@@ -2332,10 +2457,10 @@ function starBadgeInfo(n, ownerId) {
   if (n.starFrom && starFromAlive(n)) return { filled: true, tip: `Star from ${n.starFrom.fromName}${n.starFrom.note ? ' — ' + n.starFrom.note : ''}` };
   const s = starsForNode(n.id, ownerId)[0];
   if (!s) return null;
-  const note = s.note ? ' — ' + s.note : '';
+  const note = (s.note ? ' — ' + s.note : '') + (s.projectName ? ` (project: ${s.projectName})` : '');
   if (s.type === 'assign') return { filled: true, tip: `Star assigned to ${s.toName}${note}` };
   if (s.status === 'approved') return { filled: true, tip: `Star approved by ${s.toName}${note}` };
-  return { filled: false, tip: `Star requested from ${s.toName} — waiting for approval` };
+  return { filled: false, tip: `Star requested from ${s.toName}${note} — waiting for approval` };
 }
 function starCount(memberId) {
   return starsList.filter(s => (s.type === 'assign' && s.toId === memberId && s.status !== 'removed') || (s.type === 'ask' && s.fromId === memberId && s.status === 'approved')).length;
@@ -2347,12 +2472,14 @@ function starsIncoming(kind) {
 function starSectionHtml(n) {
   const m = activeMember(); if (!m) return '';
   let body = '';
-  if (n.starFrom && starFromAlive(n)) {
+  if (n.starCopy) {
+    body = `<div class="star-status">⭐ You approved a star for <b>${escapeHtml(n.starCopy.fromName)}</b> for this work</div>`;
+    body += starHistoryHtml(starsList.find(x => x.id === n.starCopy.starId));
+    if (isAdmin) body += `<div class="star-btn-row"><button class="star-btn" type="button" onclick="removeStar('${n.starCopy.starId}')">🗑 Remove star</button></div>`;
+  } else if (n.starFrom && starFromAlive(n)) {
     body = `<div class="star-status">⭐ Star from <b>${escapeHtml(n.starFrom.fromName)}</b>${n.starFrom.note ? ' — ' + escapeHtml(n.starFrom.note) : ''}</div>`;
+    body += starHistoryHtml(starsList.find(x => x.id === n.starFrom.starId));
     if (isAdmin) body += `<div class="star-btn-row"><button class="star-btn" type="button" onclick="removeStar('${n.starFrom.starId}')">🗑 Remove star</button></div>`;
-    if (isMyBoard() && m.projects.length > 1) {
-      body += `<div class="star-btn-row"><button class="star-btn" type="button" onclick="openStarMovePanel('${n.id}')">📁 Move to another project</button></div><div id="star-sub"></div>`;
-    }
   } else {
     const s = starsForNode(n.id, m.id)[0];
     const removeBtn = s && (isAdmin || (isMyBoard() && canEditNode(n)))
@@ -2360,11 +2487,13 @@ function starSectionHtml(n) {
     if (s && s.type === 'assign') body = `<div class="star-status">⭐ Star assigned to <b>${escapeHtml(s.toName)}</b></div>${removeBtn}`;
     else if (s && s.status === 'approved') body = `<div class="star-status">⭐ Star approved by <b>${escapeHtml(s.toName)}</b></div>${removeBtn}`;
     else if (s) body = `<div class="star-status">⏳ Star requested from <b>${escapeHtml(s.toName)}</b> — waiting for approval</div>${removeBtn}`;
-    else if (isMyBoard()) body = `<div class="star-btn-row">
+    else if (canGiveStar()) body = `<div class="star-btn-row">
         <button class="star-btn" type="button" onclick="openStarPanel('${n.id}','assign')">⭐ Assign star to member</button>
-        <button class="star-btn" type="button" onclick="openStarPanel('${n.id}','ask')">🙋 Request a star</button>
+        <button class="star-btn" type="button" onclick="openAskStarDialog('${n.id}')">🙋 Request a star</button>
       </div><div id="star-sub"></div>`;
     else return '';
+    const hs = starsList.filter(x => x.nodeId === n.id && x.fromId === m.id && x.status !== 'removed').sort((a, b) => b.createdAt - a.createdAt)[0];
+    if (hs) body += starHistoryHtml(hs);
   }
   return `<div class="d-section">Stars</div>${body}`;
 }
@@ -2385,23 +2514,49 @@ function toggleStarSub(sub, key) {
 function openStarPanel(nodeId, mode) {
   const sub = document.getElementById('star-sub'); if (!sub) return;
   if (!toggleStarSub(sub, mode)) return;
-  const me = myMemberId();
-  const others = data.members.filter(x => x.id !== me && isMemberCurrent(x));
+  const owner = activeMember();
+  const others = data.members.filter(x => x.id !== (owner && owner.id) && isMemberCurrent(x));
   if (!others.length) { sub.innerHTML = '<div class="star-hint">No other team members yet.</div>'; return; }
   sub.innerHTML = `<div class="star-sub">
-    <div class="star-sub-title">${mode === 'assign' ? 'Assign this star to' : 'Ask for a star from'}</div>
+    <div class="star-sub-title">Assign this star to</div>
     <select id="star-member" class="star-input">${others.map(x => `<option value="${x.id}">${escapeHtml(x.name)}</option>`).join('')}</select>
-    <input id="star-note" class="star-input" maxlength="80" oninput="limitStarNote(this)" placeholder="${mode === 'assign' ? 'What did they help with?' : 'What did you do?'}">
+    <input id="star-note" class="star-input" maxlength="80" oninput="limitStarNote(this)" placeholder="What did they help with?">
     <div class="star-hint" id="star-note-hint" style="margin-top:0">Required · 0/${STAR_NOTE_MAX_WORDS} words</div>
     <div class="star-sub-actions">
       <button class="btn btn-dismiss" type="button" onclick="document.getElementById('star-sub').innerHTML=''">Cancel</button>
       <button class="btn btn-save" type="button" onclick="confirmStar('${nodeId}','${mode}')">Done</button>
     </div></div>`;
 }
-async function confirmStar(nodeId, mode) {
-  const m = activeMember(); if (!m || !isMyBoard()) return;
+async function submitStar(mode, nodeId, toId, note, project) {
+  const m = activeMember(); if (!m || !canGiveStar()) return;
   const n = findNode(m, nodeId); if (!n) return;
-  const to = data.members.find(x => x.id === document.getElementById('star-member').value); if (!to) return;
+  const to = data.members.find(x => x.id === toId); if (!to) return;
+  const behalf = m.id !== myMemberId();
+  const s = {
+    id: genId(), type: mode, fromId: m.id, fromName: m.name, toId: to.id, toName: to.name,
+    nodeId, nodeText: n.text, nodeKind: n.kind || 'sub', nodeDate: n.date || todayStr(), bullets: (n.bullets || []).filter(b => b && b.trim()),
+    note, status: 'pending', createdAt: Date.now()
+  };
+  if (project) { s.projectId = project.id; s.projectName = project.name; }
+  if (behalf) {
+    s.byAdmin = true;
+    if (mode === 'ask') { s.status = 'approved'; s.decidedAt = s.createdAt; s.approvedBy = 'admin'; }
+  }
+  const refreshDetail = () => {
+    const open = detailTopicId === nodeId && document.getElementById('detail-panel').classList.contains('open');
+    if (open) showTopicDetail(findNode(activeMember(), nodeId));
+  };
+  starsList.push(s);
+  buildD3Map(); refreshDetail();
+  try { await window.fbSetDoc(window.fbDoc('stars', s.id), s); }
+  catch (e) {
+    console.error('Star write failed', e);
+    starsList = starsList.filter(x => x.id !== s.id);
+    buildD3Map(); refreshDetail();
+    alert('Could not save the star — check your connection and permissions.');
+  }
+}
+async function confirmStar(nodeId, mode) {
   const noteInput = document.getElementById('star-note');
   const nWords = starWords(noteInput.value).length;
   if (nWords < 1 || nWords > STAR_NOTE_MAX_WORDS) {
@@ -2411,20 +2566,90 @@ async function confirmStar(nodeId, mode) {
     noteInput.focus();
     return;
   }
-  const s = {
-    id: genId(), type: mode, fromId: m.id, fromName: m.name, toId: to.id, toName: to.name,
-    nodeId, nodeText: n.text, nodeKind: n.kind || 'sub', bullets: (n.bullets || []).filter(b => b && b.trim()),
-    note: starWords(noteInput.value).join(' '), status: 'pending', createdAt: Date.now()
+  await submitStar(mode, nodeId, document.getElementById('star-member').value, starWords(noteInput.value).join(' '));
+}
+// ── Ask-for-a-star dialog: opened from the toolbar ★ Star button (adds a new Star node to the
+// Stars row) or from "Request a star" on an existing node's description panel.
+let askStarNodeId = null;
+function limitAskField(input, hintId) {
+  const w = starWords(input.value);
+  if (w.length > STAR_NOTE_MAX_WORDS) input.value = w.slice(0, STAR_NOTE_MAX_WORDS).join(' ');
+  const hint = document.getElementById(hintId);
+  hint.textContent = `Required · ${Math.min(w.length, STAR_NOTE_MAX_WORDS)}/${STAR_NOTE_MAX_WORDS} words`; hint.style.color = '';
+}
+function fillAskProjects() {
+  const mem = data.members.find(x => x.id === document.getElementById('ask-member').value);
+  document.getElementById('ask-project').innerHTML = mem
+    ? (mem.projects || []).map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('') + `<option value="${RANDOM_WORK_ID}">Random work</option>`
+    : '';
+}
+function closeAskStarDialog() { document.getElementById('ov-star-ask').classList.remove('open'); }
+function openAskStarDialog(nodeId) {
+  const m = activeMember(); if (!m || !canGiveStar()) return;
+  const others = data.members.filter(x => x.id !== m.id && isMemberCurrent(x));
+  if (!others.length) { alert('No other team members to ask yet.'); return; }
+  const n = nodeId ? findNode(m, nodeId) : null;
+  if (nodeId && !n) return;
+  askStarNodeId = n ? n.id : null;
+  const behalfEl = document.getElementById('ask-behalf');
+  behalfEl.style.display = m.id !== myMemberId() ? '' : 'none';
+  behalfEl.innerHTML = `Acting for <b>${escapeHtml(m.name)}</b> — as admin, this star is approved automatically.`;
+  document.getElementById('ask-title-wrap').style.display = n ? 'none' : '';
+  document.getElementById('ask-date-wrap').style.display = n ? 'none' : '';
+  const dateInput = document.getElementById('ask-date');
+  const bounds = dateRestrictionBounds(m);
+  dateInput.value = todayStr(); dateInput.min = bounds.min || ''; dateInput.max = bounds.max || '';
+  const ex = document.getElementById('ask-existing');
+  ex.style.display = n ? '' : 'none'; ex.textContent = n ? n.text : '';
+  document.getElementById('ask-title').value = '';
+  const h = document.getElementById('ask-title-hint'); h.textContent = `Required · 0/${STAR_NOTE_MAX_WORDS} words`; h.style.color = '';
+  document.getElementById('ask-member').innerHTML = others.map(x => `<option value="${x.id}">${escapeHtml(x.name)}</option>`).join('');
+  fillAskProjects();
+  document.getElementById('ov-star-ask').classList.add('open');
+  if (!n) document.getElementById('ask-title').focus();
+}
+async function confirmAskStar() {
+  const m = activeMember(); if (!m || !canGiveStar()) return;
+  const existing = askStarNodeId ? findNode(m, askStarNodeId) : null;
+  const check = (inputId, hintId) => {
+    const input = document.getElementById(inputId), w = starWords(input.value);
+    if (w.length >= 1 && w.length <= STAR_NOTE_MAX_WORDS) return w.join(' ');
+    const hint = document.getElementById(hintId);
+    hint.textContent = w.length < 1 ? 'Please fill this in (1–5 words).' : `Please use at most ${STAR_NOTE_MAX_WORDS} words.`;
+    hint.style.color = '#b91c1c'; input.focus();
+    return null;
   };
-  starsList.push(s);
-  buildD3Map(); showTopicDetail(findNode(activeMember(), nodeId));
-  try { await window.fbSetDoc(window.fbDoc('stars', s.id), s); }
-  catch (e) {
-    console.error('Star write failed', e);
-    starsList = starsList.filter(x => x.id !== s.id);
-    buildD3Map(); showTopicDetail(findNode(activeMember(), nodeId));
-    alert('Could not save the star — check your connection and permissions.');
+  const title = existing ? existing.text : check('ask-title', 'ask-title-hint'); if (!title) return;
+  const dateVal = existing ? existing.date : document.getElementById('ask-date').value;
+  if (!existing) {
+    if (!dateVal) { alert('Please pick a date.'); return; }
+    if (!isDateAllowed(m, dateVal)) {
+      const { min, max } = dateRestrictionBounds(m);
+      const range = min && max ? `between ${min} and ${max}` : min ? `on or after ${min}` : `on or before ${max}`;
+      alert(`Your admin has restricted which dates you can use right now — pick a date ${range}.`);
+      return;
+    }
   }
+  const toId = document.getElementById('ask-member').value;
+  const projSel = document.getElementById('ask-project');
+  const project = projSel.value ? { id: projSel.value, name: projSel.selectedOptions[0].text } : null;
+  closeAskStarDialog();
+  let node = existing;
+  if (!node) {
+    const anchor = m.lastTopicId ? findNode(m, m.lastTopicId) : null;
+    if (anchor && inStarRow(m, anchor.id)) {
+      node = { id: genId(), text: title, date: dateVal, kind: 'star', bullets: [], createdAt: Date.now(), children: [] };
+      anchor.children = anchor.children || [];
+      anchor.children.push(node);
+      positionNewNode(m, node, anchor.id);
+    } else {
+      node = { id: genId(), text: title, date: dateVal, kind: 'star', bullets: [], createdAt: Date.now(), children: [], standalone: true, projectId: STAR_LANE_ID };
+      m.topics.push(node);
+    }
+    save();
+  }
+  await submitStar('ask', node.id, toId, '', project);
+  if (!existing) setTimeout(() => zoomToMapNode(node.id), 450);
 }
 async function removeStar(starId) {
   const s = starsList.find(x => x.id === starId); if (!s) return;
@@ -2447,10 +2672,14 @@ let starsLoaded = false;
 function reconcileStars() {
   if (!starsLoaded) return;
   const me = myMemberId(); const m = data.members.find(x => x.id === me); if (!m) return;
-  const ids = new Set(); let boardChanged = false, starsChanged = false;
+  const ids = new Set(), deadCopies = []; let boardChanged = false, starsChanged = false;
   (function walk(arr) {
     for (const n of arr || []) {
       ids.add(n.id);
+      if (n.starCopy) {
+        const cd = starsList.find(s => s.id === n.starCopy.starId);
+        if (!cd || cd.status === 'removed' || cd.status === 'declined') deadCopies.push(n.id);
+      }
       if (n.starFrom) {
         const sd = starsList.find(s => s.id === n.starFrom.starId);
         if (!sd || sd.status === 'removed') { delete n.starFrom; boardChanged = true; }
@@ -2458,6 +2687,19 @@ function reconcileStars() {
       walk(n.children);
     }
   })(m.topics);
+  deadCopies.forEach(id => {
+    const arr = findParentArray(m, id), i = arr ? arr.findIndex(x => x.id === id) : -1;
+    if (i >= 0) arr.splice(i, 1);
+    pruneConnections(m, [id]); ids.delete(id);
+    if (m.lastTopicId === id) m.lastTopicId = null;
+    boardChanged = true;
+  });
+  starsList.slice().forEach(s => {
+    if (s.type === 'ask' && s.toId === me && s.status === 'approved' && !s.copyMade) {
+      addStarCopy(s, true); s.copyMade = true;
+      window.fbSetDoc(window.fbDoc('stars', s.id), s).catch(e => console.error('Star update failed', e));
+    }
+  });
   starsList.slice().forEach(s => {
     if (s.type === 'assign' && s.toId === me && s.status === 'placed' && s.placedNodeId && !ids.has(s.placedNodeId)) {
       s.status = 'removed'; starsChanged = true;
@@ -2476,20 +2718,32 @@ function openStarInbox(kind) {
   if (!list.length) { closeStarInbox(); return; }
   const s = list[0];
   const me = data.members.find(x => x.id === myMemberId()); if (!me) return;
-  const task = `<div class="star-task">${escapeHtml(s.nodeText)}</div>${s.note ? `<div class="star-hint">“${escapeHtml(s.note)}”</div>` : ''}`;
+  const task = `<div class="star-task">${escapeHtml(s.nodeText)}</div>${s.projectName ? `<div class="star-hint">Project: <b>${escapeHtml(s.projectName)}</b></div>` : ''}${s.note ? `<div class="star-hint">“${escapeHtml(s.note)}”</div>` : ''}`;
   const more = list.length > 1 ? `<div class="star-hint">${list.length - 1} more waiting after this one.</div>` : '';
   document.getElementById('star-inbox-title').textContent = kind === 'assign' ? '⭐ You received a star' : '🙋 Star request';
   if (kind === 'assign') {
     document.getElementById('star-inbox-body').innerHTML = `<div><b>${escapeHtml(s.fromName)}</b> gave you a star for helping with:</div>${task}
       <div class="fg"><label>Which project should it be added to?</label>
-      <select id="star-proj" class="star-input">${me.projects.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')}</select></div>
+      <select id="star-proj" class="star-input">${me.projects.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')}<option value="${STAR_LANE_ID}">⭐ Stars row</option></select></div>
       <div class="star-hint">It lands in this week as a free-floating node marked with a star — connect it to any of your nodes later.</div>${more}`;
     document.getElementById('star-inbox-footer').innerHTML = `<button class="btn btn-dismiss" onclick="closeStarInbox()">Later</button>
       <button class="btn btn-save" onclick="placeStar('${s.id}')">Add to project</button>`;
   } else {
-    document.getElementById('star-inbox-body').innerHTML = `<div><b>${escapeHtml(s.fromName)}</b> is asking you to approve a star for:</div>${task}${more}`;
-    document.getElementById('star-inbox-footer').innerHTML = `<button class="btn btn-dismiss" onclick="decideStar('${s.id}',false)">Decline</button>
-      <button class="btn btn-save" onclick="decideStar('${s.id}',true)">Approve star</button>`;
+    // Every pending request at once, each with its own Decline / Approve.
+    document.getElementById('star-inbox-title').textContent = `🙋 Star requests (${list.length})`;
+    document.getElementById('star-inbox-body').innerHTML = `<div class="star-req-list">${list.map(r => `
+      <div class="star-req">
+        <div><b>${escapeHtml(r.fromName)}</b> is asking you to approve a star for:</div>
+        <div class="star-task">${escapeHtml(r.nodeText)}</div>
+        ${r.projectName ? `<div class="star-hint">Project: <b>${escapeHtml(r.projectName)}</b></div>` : ''}
+        ${r.note ? `<div class="star-hint">“${escapeHtml(r.note)}”</div>` : ''}
+        <div class="star-hint">Requested ${escapeHtml(formatTimestamp(r.createdAt))}</div>
+        <div class="star-req-actions">
+          <button class="btn btn-dismiss" type="button" onclick="decideStar('${r.id}',false)">Decline</button>
+          <button class="btn btn-save" type="button" onclick="decideStar('${r.id}',true)">Approve star</button>
+        </div>
+      </div>`).join('')}</div>`;
+    document.getElementById('star-inbox-footer').innerHTML = '';
   }
   document.getElementById('ov-star-inbox').classList.add('open');
 }
@@ -2500,10 +2754,11 @@ async function placeStar(starId) {
   const projId = document.getElementById('star-proj').value;
   if (viewMemberId !== me) switchViewMember(me);
   const node = {
-    id: genId(), text: s.nodeText, date: todayStr(), kind: s.nodeKind || 'sub', bullets: (s.bullets || []).slice(),
+    id: genId(), text: s.nodeText, date: todayStr(), kind: projId === STAR_LANE_ID ? 'star' : (s.nodeKind || 'sub'), bullets: (s.bullets || []).slice(),
     createdAt: Date.now(), children: [], standalone: true, projectId: projId,
     starFrom: { fromId: s.fromId, fromName: s.fromName, note: s.note || '', starId: s.id }
   };
+  if (projId === STAR_LANE_ID) node.origKind = s.nodeKind || 'sub';
   m.topics.push(node);
   s.status = 'placed'; s.placedAt = Date.now(); s.placedNodeId = node.id;
   save(); buildD3Map(); renderMemberSidebar();
@@ -2512,32 +2767,35 @@ async function placeStar(starId) {
   catch (e) { console.error('Star update failed', e); }
   if (starsIncoming('assign').length) openStarInbox('assign'); else closeStarInbox();
 }
-function openStarMovePanel(nodeId) {
-  const m = activeMember(), sub = document.getElementById('star-sub'); if (!m || !sub) return;
-  const n = findNode(m, nodeId); if (!n) return;
-  if (!toggleStarSub(sub, 'move')) return;
-  sub.innerHTML = `<div class="star-sub">
-    <div class="star-sub-title">Move this star to project</div>
-    <select id="star-move-proj" class="star-input">${m.projects.map(p => `<option value="${p.id}"${p.id === n.projectId ? ' selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}</select>
-    <div class="star-sub-actions">
-      <button class="btn btn-dismiss" type="button" onclick="document.getElementById('star-sub').innerHTML=''">Cancel</button>
-      <button class="btn btn-save" type="button" onclick="moveStarNode('${nodeId}')">Done</button>
-    </div></div>`;
-}
-function moveStarNode(nodeId) {
-  const m = activeMember(); if (!m || !isMyBoard()) return;
-  const n = findNode(m, nodeId); if (!n || !n.starFrom) return;
-  const projId = document.getElementById('star-move-proj').value;
-  if (!projId || (n.projectId === projId && n.standalone)) return;
+// Used by the Edit dialog: puts a received star node into another project (or the Stars row),
+// switching it to/from the Star node look as needed.
+function applyStarProject(nodeId, projId) {
   reparentNode(nodeId, null, projId);
-  const moved = findNode(activeMember(), nodeId);
+  const moved = findNode(activeMember(), nodeId); if (!moved) return;
   moved.standalone = true;
+  if (projId === STAR_LANE_ID) { if (moved.kind !== 'star') { moved.origKind = moved.kind || 'sub'; moved.kind = 'star'; } }
+  else if (moved.kind === 'star') { moved.kind = moved.origKind || 'sub'; delete moved.origKind; }
   delete moved.manualY; delete moved.manualX;
-  save(); buildD3Map(); showTopicDetail(moved);
+}
+// After an approval, the member the work was done for gets a red copy of the Star node, floating
+// (unconnected) in the same week column, in the project the requester picked. "Random work"
+// has no project, so it gets no copy.
+function addStarCopy(s, quiet) {
+  const me = myMemberId(); const m = data.members.find(x => x.id === me); if (!m) return;
+  if (!s.projectId || s.projectId === RANDOM_WORK_ID || !(m.projects || []).some(p => p.id === s.projectId)) return;
+  if (collectProjectNodes(m).some(r => r.node.starCopy && r.node.starCopy.starId === s.id)) return;
+  m.topics.push({
+    id: genId(), text: s.nodeText, date: s.nodeDate || todayStr(), kind: 'star', bullets: [], createdAt: Date.now(),
+    children: [], standalone: true, projectId: s.projectId,
+    starCopy: { starId: s.id, fromId: s.fromId, fromName: s.fromName }
+  });
+  if (quiet) { pushMemberToFirestore(m); if (viewMemberId === me) buildD3Map(); }
+  else if (viewMemberId === me) { save(); buildD3Map(); } else pushMemberToFirestore(m);
 }
 async function decideStar(starId, approve) {
   const s = starsList.find(x => x.id === starId); if (!s) return;
   s.status = approve ? 'approved' : 'declined'; s.decidedAt = Date.now();
+  if (approve) { addStarCopy(s); s.copyMade = true; }
   renderMemberSidebar();
   try { await window.fbSetDoc(window.fbDoc('stars', s.id), s); }
   catch (e) { console.error('Star update failed', e); alert('Could not save your decision — check your connection and permissions.'); }
@@ -2627,16 +2885,17 @@ function mapTopic(n) {
 function buildTree(m) {
   // An invisible super-root wraps one visible root circle per project, so a single
   // d3.hierarchy can hold several independent trails that all share the week-column canvas.
-  return {
-    id: '__super__', type: 'super', name: '',
-    children: (m.projects || []).filter(p => !isProjectHidden(m.id, p.id)).map(p => {
-      const topics = m.topics.filter(t => t.projectId === p.id);
-      const collapsed = isProjectCollapsed(m.id, p.id);
-      // A collapsed project keeps its root/lane visible but drops its topics from the tree
-      // entirely (not just visually) — its lane shrinks to a minimal strip below.
-      return { id: p.id, type: 'root', name: p.name, color: m.color, projectId: p.id, count: countTopics(topics), collapsed, children: collapsed ? [] : topics.map(mapTopic) };
-    })
-  };
+  const lanes = (m.projects || []).filter(p => !isProjectHidden(m.id, p.id)).map(p => {
+    const topics = m.topics.filter(t => t.projectId === p.id && !(isStarNodesHidden(m.id) && isStarDerived(t)));
+    const collapsed = isProjectCollapsed(m.id, p.id);
+    // A collapsed project keeps its root/lane visible but drops its topics from the tree
+    // entirely (not just visually) — its lane shrinks to a minimal strip below.
+    return { id: p.id, type: 'root', name: p.name, color: m.color, projectId: p.id, count: countTopics(topics), collapsed, children: collapsed ? [] : topics.map(mapTopic) };
+  });
+  const starTopics = m.topics.filter(t => t.projectId === STAR_LANE_ID);
+  const starCollapsed = isProjectCollapsed(m.id, STAR_LANE_ID);
+  lanes.push({ id: STAR_LANE_ID, type: 'root', name: 'Stars', color: m.color, projectId: STAR_LANE_ID, isStarLane: true, count: countTopics(starTopics), collapsed: starCollapsed, children: starCollapsed ? [] : starTopics.map(mapTopic) });
+  return { id: '__super__', type: 'super', name: '', children: lanes };
 }
 // Header controls (Admin badge/Manage Members/Sign Out) live outside the per-board toolbar
 // so they stay reachable even before any member exists — this must not depend on activeMember().
@@ -2754,6 +3013,7 @@ function updateToolbarHint() {
   ['btn-add-node', 'btn-add-sub', 'btn-add-subsub'].forEach(id => {
     document.getElementById(id).disabled = !editable;
   });
+  document.getElementById('btn-add-star').disabled = !canGiveStar();
   document.getElementById('btn-commit').style.display = isAdmin ? '' : 'none';
   // Export is available to a member on their own board too (just their own data, not
   // everyone's — see exportData()) — Import stays admin-only, since it overwrites whatever
@@ -2836,6 +3096,7 @@ function mapUpdate(source) {
   // capped at 13px) — its padding needs to clear that lean on both sides, not just the
   // straight-edge octagon's small corner cuts that Sub Node uses.
   const subsubPadL = 14, subsubPadR = 14;
+  const starPadL = 14, starPadR = 26;
   const lineHeight = 13, cellPadY = 9, minCellHeight = 26, rowGap = 18;
   const totalCols = range.maxIdx - range.minIdx + 1;
 
@@ -2877,18 +3138,21 @@ function mapUpdate(source) {
     const col = idx - range.minIdx;
     const fullWidth = colWidths[col] - colInset - colRightMargin;
     const ref = d.data.nodeRef;
-    const isNarrow = ref && (ref.kind === 'sub' || ref.kind === 'subsub');
+    const isNarrow = ref && (ref.kind === 'sub' || ref.kind === 'subsub' || ref.kind === 'star');
 
     if (isNarrow) {
-      const [padL, padR] = ref.kind === 'subsub' ? [subsubPadL, subsubPadR] : [subPadL, subPadR];
+      const [padL, padR] = ref.kind === 'subsub' ? [subsubPadL, subsubPadR] : ref.kind === 'star' ? [starPadL, starPadR] : [subPadL, subPadR];
       // Width follows the title's own length instead of a fixed slot — capped so the cell's
       // right edge can never reach past the week column's actual vertical center line, no
       // matter how long its text is (measured from the cell's left edge, colInset in from
       // the column's own left edge, out to the column's midpoint).
-      const maxWidth = colWidths[col] / 2 - colInset;
+      const maxWidth = ref.kind === 'star' ? colWidths[col] - colInset - colRightMargin : colWidths[col] / 2 - colInset;
       const minWidth = 64;
       const contentWidth = maxWidth - padL - padR;
-      const lines = wrapToRows(d.data.name, contentWidth, TOPIC_FONT, NARROW_MAX_ROWS);
+      const starWordsList = ref.kind === 'star' ? d.data.name.split(/\s+/).filter(Boolean) : null;
+      const lines = starWordsList
+        ? (starWordsList.length > 3 ? [starWordsList.slice(0, 3).join(' '), starWordsList.slice(3).join(' ')] : [starWordsList.join(' ')])
+        : wrapToRows(d.data.name, contentWidth, TOPIC_FONT, NARROW_MAX_ROWS);
       const linesWidth = Math.max(...lines.map(l => measureTextWidth(l, TOPIC_FONT)));
       const cellWidth = Math.min(maxWidth, Math.max(minWidth, linesWidth + padL + padR));
       const cellHeight = Math.max(minCellHeight, lines.length * lineHeight + cellPadY);
@@ -3222,13 +3486,13 @@ function mapUpdate(source) {
   rE.append('circle').attr('class', 'anchor-ring').attr('r', 26).attr('fill', 'none').attr('stroke', '#fbbf24').attr('stroke-width', 2).attr('stroke-opacity', 0)
     .style('pointer-events', 'all');
   rE.append('text').attr('class', 'root-emoji').attr('text-anchor', 'middle').attr('dy', '0.38em')
-    .attr('font-size', ROOT_EMOJI_SIZE).style('pointer-events', 'none').style('user-select', 'none').text('🙂');
+    .attr('font-size', ROOT_EMOJI_SIZE).style('pointer-events', 'none').style('user-select', 'none').text(d => d.data.isStarLane ? '⭐' : '🙂');
   rE.each(function (d) {
     const g = d3.select(this);
     const lines = wrapText(d.data.name, ROOT_LABEL_MAX_WIDTH, ROOT_LABEL_FONT);
     const text = g.append('text').attr('class', 'editable-label').attr('text-anchor', 'end')
-      .attr('font-size', '15').attr('font-weight', '800').attr('fill', '#1e293b').style('cursor', 'text')
-      .on('click', function (event) { editNodeName(event, d, g); });
+      .attr('font-size', '15').attr('font-weight', '800').attr('fill', '#1e293b').style('cursor', d.data.isStarLane ? 'pointer' : 'text')
+      .on('click', function (event) { if (d.data.isStarLane) return; editNodeName(event, d, g); });
     lines.forEach((line, i) => {
       const y = -((lines.length - 1) * 15) / 2 + i * 15;
       text.append('tspan').attr('x', ROOT_LABEL_X).attr('y', y).attr('dy', '0.32em').text(line);
@@ -3261,14 +3525,19 @@ function mapUpdate(source) {
     .attr('x', -3).attr('y', d => -d.cellHeight / 2 - 3).attr('width', d => d.cellWidth + 6).attr('height', d => d.cellHeight + 6);
   tE.append('path').attr('class', 'topic-box')
     .attr('d', d => cellShapePath(nodeKind(d), d.cellWidth, d.cellHeight))
-    .attr('fill', d => KIND_COLORS[nodeKind(d)].fill)
-    .attr('stroke', d => KIND_COLORS[nodeKind(d)].stroke).attr('stroke-width', 1.5);
+    .attr('fill', d => nodePalette(d).fill)
+    .attr('stroke', d => nodePalette(d).stroke).attr('stroke-width', 1.5);
   tE.append('text').attr('class', 'editable-label').attr('font-size', '11').attr('font-weight', '700')
-    .attr('fill', d => KIND_COLORS[nodeKind(d)].text).style('cursor', 'text')
+    .attr('fill', d => nodePalette(d).text).style('cursor', 'text')
     .on('click', function (event, d) { editNodeName(event, d, d3.select(this.parentNode)); });
   // Corner star badge — marks a node that carries a star without touching its own colors.
   tE.each(function (d) {
-    const info = starBadgeInfo(d.data.nodeRef, viewMemberId);
+    let info = starBadgeInfo(d.data.nodeRef, viewMemberId);
+    // A Star node always carries the corner star, even when it has no active request.
+    if (!info && nodeKind(d) === 'star') {
+      const sc = d.data.nodeRef.starCopy;
+      info = { filled: true, tip: sc ? `Star approved for ${sc.fromName}` : 'Star node' };
+    }
     if (!info) return;
     const g = d3.select(this).append('g').attr('class', 'star-badge')
       .attr('transform', `translate(${d.cellWidth - 17},${-d.cellHeight / 2})`);
@@ -3353,7 +3622,7 @@ function mapUpdate(source) {
     const textSel = g.select('.editable-label');
     textSel.selectAll('tspan').remove();
     const k = nodeKind(d);
-    const padL = k === 'sub' ? subPadL : k === 'subsub' ? subsubPadL : cellPadL;
+    const padL = k === 'sub' ? subPadL : k === 'subsub' ? subsubPadL : k === 'star' ? starPadL : cellPadL;
     // A Node's box is always the full column width regardless of how short its title is —
     // left-aligning it (like the content-fit Sub Node/Micro Node boxes, where left-align and
     // centered are barely distinguishable) left short titles looking glued to the left edge
@@ -3469,6 +3738,11 @@ function cellShapePath(kind, w, h) {
   if (kind === 'subsub') {
     const skew = Math.min(w * 0.18, 13);
     return `M${skew},${y0} L${w},${y0} L${w - skew},${y1} L0,${y1} Z`;
+  }
+  if (kind === 'star') {
+    // Same outline as the toolbar ★ Star button: pointed ends, top and bottom edges dipping in at the middle.
+    const dip = h * 0.14, inset = w * 0.07;
+    return `M0,0 L${inset},${y0} L${w / 2},${y0 + dip} L${w - inset},${y0} L${w},0 L${w - inset},${y1} L${w / 2},${y1 - dip} L${inset},${y1} Z`;
   }
   const cut = Math.min(w * 0.13, h * 0.3, 7);
   return `M${cut},${y0} L${w - cut},${y0} L${w},${y0 + cut} L${w},${y1 - cut} L${w - cut},${y1} L${cut},${y1} L0,${y1 - cut} L0,${y0 + cut} Z`;
@@ -3735,7 +4009,8 @@ function treeEndpointDrag(childId, endKey) {
     .on('end', function () {
       d3.select(this).attr('r', 6);
       const target = findNearestTopicOrRootNode(cx, cy, 30);
-      if (target) {
+      const intoStarRow = target && (target.data.type === 'root' ? !!target.data.isStarLane : inStarRow(activeMember(), target.data.nodeRef.id));
+      if (target && (!intoStarRow || inStarRow(activeMember(), childId))) {
         const newParentId = target.data.type === 'root' ? null : target.data.nodeRef.id;
         reparentNode(childId, newParentId, target.data.type === 'root' ? target.data.projectId : null);
       }
@@ -4009,7 +4284,7 @@ function openBalloonInlineEditor(nodeId, balloonId, bx, bodyY, gParent) {
     const row = document.createElement('div'); row.className = 'bie-point-row';
     const ta = document.createElement('textarea'); ta.className = 'bie-pt-ta'; ta.rows = 1; ta.placeholder = 'Add a point…';
     ta.value = value || '';
-    ta.addEventListener('input', () => { ta.style.height = '24px'; ta.style.height = ta.scrollHeight + 'px'; fitFo(); });
+    ta.addEventListener('input', () => { applyWordCap(ta, BULLET_MAX_WORDS); ta.style.height = '24px'; ta.style.height = ta.scrollHeight + 'px'; fitFo(); });
     const rm = document.createElement('button'); rm.className = 'bie-pt-rm'; rm.textContent = '×'; rm.type = 'button';
     rm.addEventListener('mousedown', e => e.stopPropagation());
     rm.addEventListener('click', e => { e.stopPropagation(); pointsList.removeChild(row); fitFo(); });
@@ -4650,6 +4925,7 @@ function setAnchor(d) {
   // Merely viewing (read-only) another member's board should never mutate their "continuing
   // from" state — only actually move the anchor when this is a board you can edit.
   if (!canEditBoard()) return;
+  if (d.data.isStarLane) return;
   const m = activeMember(); if (!m) return;
   if (d.data.type === 'root') { m.lastProjectId = d.data.projectId; m.lastTopicId = null; }
   else { m.lastTopicId = d.data.nodeRef ? d.data.nodeRef.id : null; }
