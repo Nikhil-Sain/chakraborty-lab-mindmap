@@ -2538,10 +2538,7 @@ async function submitStar(mode, nodeId, toId, note, project) {
     note, status: 'pending', createdAt: Date.now()
   };
   if (project) { s.projectId = project.id; s.projectName = project.name; }
-  if (behalf) {
-    s.byAdmin = true;
-    if (mode === 'ask') { s.status = 'approved'; s.decidedAt = s.createdAt; s.approvedBy = 'admin'; }
-  }
+  if (behalf) s.byAdmin = true;
   const refreshDetail = () => {
     const open = detailTopicId === nodeId && document.getElementById('detail-panel').classList.contains('open');
     if (open) showTopicDetail(findNode(activeMember(), nodeId));
@@ -2593,7 +2590,7 @@ function openAskStarDialog(nodeId) {
   askStarNodeId = n ? n.id : null;
   const behalfEl = document.getElementById('ask-behalf');
   behalfEl.style.display = m.id !== myMemberId() ? '' : 'none';
-  behalfEl.innerHTML = `Acting for <b>${escapeHtml(m.name)}</b> — as admin, this star is approved automatically.`;
+  behalfEl.innerHTML = `Acting for <b>${escapeHtml(m.name)}</b> — as admin. The teammate still has to approve it.`;
   document.getElementById('ask-title-wrap').style.display = n ? 'none' : '';
   document.getElementById('ask-date-wrap').style.display = n ? 'none' : '';
   const dateInput = document.getElementById('ask-date');
