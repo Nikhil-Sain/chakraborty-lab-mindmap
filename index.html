@@ -760,13 +760,16 @@ function starHistoryHtml(s) {
   if (!s) return '';
   const row = (label, ts, extra) => `<div class="star-hist-row"><span>${label}</span><span>${ts ? escapeHtml(formatTimestamp(ts)) : '—'}${extra || ''}</span></div>`;
   const byAdmin = s.byAdmin ? ' · by admin' : '';
+  const decidedBy = s.decidedByName
+    ? ` by ${escapeHtml(s.decidedByName)} (${s.decidedByRole || 'member'})`
+    : (s.approvedBy === 'admin' || s.decidedBy === 'admin' ? ' by admin' : ` by ${escapeHtml(s.toName)} (member)`);
   let rows;
   if (s.type === 'assign') {
-    rows = row('⭐ Assigned', s.createdAt, byAdmin) + (s.status === 'placed' ? row('✓ Accepted', s.placedAt) : row('⏳ Accepted', null));
+    rows = row('⭐ Assigned', s.createdAt, byAdmin) + (s.status === 'placed' ? row(`✓ Accepted by ${escapeHtml(s.toName)} (member)`, s.placedAt) : row('⏳ Accepted', null));
   } else {
     rows = row('🙋 Requested', s.createdAt, byAdmin)
-      + (s.status === 'approved' ? row(s.approvedBy === 'admin' ? '✓ Approved (by admin)' : '✓ Approved', s.decidedAt)
-        : s.status === 'declined' ? row('✕ Declined', s.decidedAt) : row('⏳ Approved', null));
+      + (s.status === 'approved' ? row(`✓ Approved${decidedBy}`, s.decidedAt)
+        : s.status === 'declined' ? row(`✕ Declined${decidedBy}`, s.decidedAt) : row('⏳ Approved', null));
   }
   return `<div class="star-hist">${rows}</div>`;
 }
@@ -2460,9 +2463,9 @@ function starBadgeInfo(n, ownerId) {
 function starCount(memberId) {
   return starsList.filter(s => (s.type === 'assign' && s.toId === memberId && s.status !== 'removed') || (s.type === 'ask' && s.fromId === memberId && s.status === 'approved')).length;
 }
-function starsIncoming(kind) {
-  const me = myMemberId();
-  return me ? starsList.filter(s => s.toId === me && s.type === kind && s.status === 'pending') : [];
+function starsIncoming(kind, memberId) {
+  const id = memberId || myMemberId();
+  return id ? starsList.filter(s => s.toId === id && s.type === kind && s.status === 'pending') : [];
 }
 function starSectionHtml(n) {
   const m = activeMember(); if (!m) return '';
@@ -2643,8 +2646,12 @@ function reconcileStars() {
   if (starsChanged || boardChanged) renderMemberSidebar();
 }
 function closeStarInbox() { document.getElementById('ov-star-inbox').classList.remove('open'); }
-function openStarInbox(kind) {
-  const list = starsIncoming(kind);
+let starInboxFor = null;
+function openStarInbox(kind, forId) {
+  if (forId && forId !== myMemberId() && !isAdmin) return;
+  starInboxFor = forId || myMemberId();
+  const actingFor = starInboxFor !== myMemberId() ? data.members.find(x => x.id === starInboxFor) : null;
+  const list = starsIncoming(kind, starInboxFor);
   if (!list.length) { closeStarInbox(); return; }
   const s = list[0];
   const me = data.members.find(x => x.id === myMemberId()); if (!me) return;
@@ -2660,10 +2667,10 @@ function openStarInbox(kind) {
       <button class="btn btn-save" onclick="placeStar('${s.id}')">Add to project</button>`;
   } else {
     // Every pending request at once, each with its own Decline / Approve.
-    document.getElementById('star-inbox-title').textContent = `🙋 Star requests (${list.length})`;
-    document.getElementById('star-inbox-body').innerHTML = `<div class="star-req-list">${list.map(r => `
+    document.getElementById('star-inbox-title').textContent = `🙋 Star requests (${list.length})${actingFor ? ' for ' + actingFor.name : ''}`;
+    document.getElementById('star-inbox-body').innerHTML = `${actingFor ? `<div class="star-hint" style="margin:0 0 8px">Deciding as admin for <b>${escapeHtml(actingFor.name)}</b>.</div>` : ''}<div class="star-req-list">${list.map(r => `
       <div class="star-req">
-        <div><b>${escapeHtml(r.fromName)}</b> is asking you to approve a star for:</div>
+        <div><b>${escapeHtml(r.fromName)}</b> is asking ${actingFor ? `<b>${escapeHtml(actingFor.name)}</b> to approve` : 'you to approve'} a star for:</div>
         <div class="star-task">${escapeHtml(r.nodeText)}</div>
         ${r.projectName ? `<div class="star-hint">Project: <b>${escapeHtml(r.projectName)}</b></div>` : ''}
         ${r.note ? `<div class="star-hint">“${escapeHtml(r.note)}”</div>` : ''}
@@ -2710,8 +2717,8 @@ function applyStarProject(nodeId, projId) {
 // After an approval, the member the work was done for gets a red copy of the Star node, floating
 // (unconnected) in the same week column, in the project the requester picked. "Random work"
 // has no project, so it gets no copy.
-function addStarCopy(s, quiet) {
-  const me = myMemberId(); const m = data.members.find(x => x.id === me); if (!m) return;
+function addStarCopy(s, quiet, memberId) {
+  const me = memberId || myMemberId(); const m = data.members.find(x => x.id === me); if (!m) return;
   if (!s.projectId || s.projectId === RANDOM_WORK_ID || !(m.projects || []).some(p => p.id === s.projectId)) return;
   if (collectProjectNodes(m).some(r => r.node.starCopy && r.node.starCopy.starId === s.id)) return;
   m.topics.push({
@@ -2724,12 +2731,17 @@ function addStarCopy(s, quiet) {
 }
 async function decideStar(starId, approve) {
   const s = starsList.find(x => x.id === starId); if (!s) return;
+  const onBehalf = s.toId !== myMemberId();
+  if (onBehalf && !isAdmin) return;
   s.status = approve ? 'approved' : 'declined'; s.decidedAt = Date.now();
-  if (approve) { addStarCopy(s); s.copyMade = true; }
+  if (onBehalf) s.decidedBy = 'admin';
+  const decider = data.members.find(x => x.id === myMemberId());
+  s.decidedById = myMemberId(); s.decidedByName = decider ? decider.name : ''; s.decidedByRole = realIsAdmin ? 'admin' : 'member';
+  if (approve) { if (onBehalf) s.approvedBy = 'admin'; addStarCopy(s, false, s.toId); s.copyMade = true; }
   renderMemberSidebar();
   try { await window.fbSetDoc(window.fbDoc('stars', s.id), s); }
   catch (e) { console.error('Star update failed', e); alert('Could not save your decision — check your connection and permissions.'); }
-  if (starsIncoming('ask').length) openStarInbox('ask'); else closeStarInbox();
+  if (starsIncoming('ask', starInboxFor).length) openStarInbox('ask', starInboxFor); else closeStarInbox();
 }
 
 function renderAll() {
@@ -2864,7 +2876,7 @@ function renderMemberSidebar() {
       <span class="member-tab-name">${escapeHtml(truncate(mm.name, 12))}</span>
       ${starCount(mm.id) ? `<span class="member-tab-stars" title="Stars received">⭐ ${starCount(mm.id)}</span>` : ''}
       ${mm.id === myMemberId() && starsIncoming('assign').length ? `<span class="member-tab-star-note" onclick="event.stopPropagation();openStarInbox('assign')">${starsIncoming('assign').length} star${starsIncoming('assign').length > 1 ? 's' : ''} received</span>` : ''}
-      ${mm.id === myMemberId() && starsIncoming('ask').length ? `<span class="member-tab-star-note" onclick="event.stopPropagation();openStarInbox('ask')">${starsIncoming('ask').length} star request${starsIncoming('ask').length > 1 ? 's' : ''}</span>` : ''}
+      ${(mm.id === myMemberId() || isAdmin) && starsIncoming('ask', mm.id).length ? `<span class="member-tab-star-note" onclick="event.stopPropagation();openStarInbox('ask','${mm.id}')">${starsIncoming('ask', mm.id).length} star request${starsIncoming('ask', mm.id).length > 1 ? 's' : ''}</span>` : ''}
       ${isAdmin && memberNeedsReview(mm) ? '<span class="member-tab-review">Needs review</span>' : ''}
       ${mm.committedAt ? '<span class="member-tab-lock">🔒</span>' : ''}
       ${canPic ? `<button class="member-avatar-edit" onclick="toggleAvatarMenu(event, '${mm.id}')" title="Change profile picture">📷</button>` : ''}
