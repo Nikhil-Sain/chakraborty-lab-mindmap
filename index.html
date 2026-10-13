@@ -71,14 +71,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
 .member-tab-stars{font-size:10px;font-weight:800;color:#b45309}
 .member-tab-star-note{font-size:7.5px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;color:#78350f;background:#fde68a;border:1px solid #f59e0b;border-radius:5px;padding:1px 5px;white-space:nowrap;cursor:pointer}
 .member-tab-star-note:hover{background:#fcd34d}
-.star-btn-row{display:flex;gap:6px;margin-top:6px}
-.star-btn{flex:1;padding:7px 8px;border-radius:8px;border:1.5px solid #f59e0b;background:#fffbeb;color:#92400e;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
-.star-btn:hover{background:#fef3c7}
-.star-sub{margin-top:8px;padding:10px;border-radius:8px;background:#fffbeb;border:1px solid #fcd34d;display:flex;flex-direction:column;gap:7px}
-.star-sub-title{font-size:11px;font-weight:700;color:#92400e}
 .star-input{width:100%;padding:7px 9px;border:1.5px solid #e5e7eb;border-radius:7px;font-size:12px;font-family:inherit;outline:none;background:#fff;color:#1e293b}
 .star-input:focus{border-color:#f59e0b}
-.star-sub-actions{display:flex;justify-content:flex-end;gap:6px}
 .star-status{margin-top:6px;padding:8px 10px;border-radius:8px;background:#fffbeb;border:1px solid #fcd34d;font-size:11.5px;color:#78350f;line-height:1.45}
 .star-task{margin:8px 0;padding:9px 11px;border-radius:8px;background:#fffbeb;border:1px solid #fcd34d;font-size:13px;font-weight:700;color:#78350f}
 .star-hint{font-size:11px;color:#6b7280;margin-top:6px}
@@ -495,7 +489,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(180d
       <div class="star-hint" id="ask-title-hint" style="margin-top:3px">Required · 0/5 words</div></div>
     <div class="fg" id="ask-date-wrap"><label>Date</label>
       <input type="date" id="ask-date"></div>
-    <div id="ask-existing" class="star-task" style="display:none"></div>
     <div class="fg"><label>Ask for a star from</label><select id="ask-member" class="star-input" onchange="fillAskProjects()"></select></div>
     <div class="fg"><label>Project name</label><select id="ask-project" class="star-input"></select></div>
     <div class="modal-footer">
@@ -2103,9 +2096,10 @@ function deleteNode(id) {
   const node = arr[idx];
   if (!canEditNode(node)) return;
   const kids = node.children || [];
-  const msg = kids.length
+  const hasStar = starsList.some(x => x.type === 'ask' && x.nodeId === node.id) || (isAdmin && !!node.starFrom);
+  const msg = (kids.length
     ? `Delete "${node.text}"? Its ${kids.length} sub-node${kids.length !== 1 ? 's' : ''} will remain as standalone floating nodes.`
-    : `Delete "${node.text}"?`;
+    : `Delete "${node.text}"?`) + (hasStar ? ' Its star will be withdrawn too.' : '');
   const doDelete = () => {
     const curM = activeMember(); if (!curM) return;
     const curArr = findParentArray(curM, id); if (!curArr) return;
@@ -2123,6 +2117,7 @@ function deleteNode(id) {
     curArr.splice(curIdx, 1);
     curKids.forEach(k => { k.standalone = true; if (inheritPid) k.projectId = inheritPid; (curM.topics || (curM.topics = [])).push(k); });
     if (curM.lastTopicId === id) curM.lastTopicId = null;
+    dropStarsForNode(curNode);
     save(); reconcileStars(); closeDetail(); buildD3Map();
   };
   if (isAdmin) { openDeleteConfirm(msg, doDelete); return; }
@@ -2475,58 +2470,22 @@ function starSectionHtml(n) {
   if (n.starCopy) {
     body = `<div class="star-status">⭐ You approved a star for <b>${escapeHtml(n.starCopy.fromName)}</b> for this work</div>`;
     body += starHistoryHtml(starsList.find(x => x.id === n.starCopy.starId));
-    if (isAdmin) body += `<div class="star-btn-row"><button class="star-btn" type="button" onclick="removeStar('${n.starCopy.starId}')">🗑 Remove star</button></div>`;
   } else if (n.starFrom && starFromAlive(n)) {
     body = `<div class="star-status">⭐ Star from <b>${escapeHtml(n.starFrom.fromName)}</b>${n.starFrom.note ? ' — ' + escapeHtml(n.starFrom.note) : ''}</div>`;
     body += starHistoryHtml(starsList.find(x => x.id === n.starFrom.starId));
-    if (isAdmin) body += `<div class="star-btn-row"><button class="star-btn" type="button" onclick="removeStar('${n.starFrom.starId}')">🗑 Remove star</button></div>`;
   } else {
     const s = starsForNode(n.id, m.id)[0];
-    const removeBtn = s && (isAdmin || (isMyBoard() && canEditNode(n)))
-      ? `<div class="star-btn-row"><button class="star-btn" type="button" onclick="removeStar('${s.id}')">🗑 Remove star</button></div>` : '';
-    if (s && s.type === 'assign') body = `<div class="star-status">⭐ Star assigned to <b>${escapeHtml(s.toName)}</b></div>${removeBtn}`;
-    else if (s && s.status === 'approved') body = `<div class="star-status">⭐ Star approved by <b>${escapeHtml(s.toName)}</b></div>${removeBtn}`;
-    else if (s) body = `<div class="star-status">⏳ Star requested from <b>${escapeHtml(s.toName)}</b> — waiting for approval</div>${removeBtn}`;
-    else if (canGiveStar()) body = `<div class="star-btn-row">
-        <button class="star-btn" type="button" onclick="openStarPanel('${n.id}','assign')">⭐ Assign star to member</button>
-        <button class="star-btn" type="button" onclick="openAskStarDialog('${n.id}')">🙋 Request a star</button>
-      </div><div id="star-sub"></div>`;
-    else return '';
+    if (s && s.type === 'assign') body = `<div class="star-status">⭐ Star assigned to <b>${escapeHtml(s.toName)}</b></div>`;
+    else if (s && s.status === 'approved') body = `<div class="star-status">⭐ Star approved by <b>${escapeHtml(s.toName)}</b></div>`;
+    else if (s) body = `<div class="star-status">⏳ Star requested from <b>${escapeHtml(s.toName)}</b> — waiting for approval</div>`;
     const hs = starsList.filter(x => x.nodeId === n.id && x.fromId === m.id && x.status !== 'removed').sort((a, b) => b.createdAt - a.createdAt)[0];
     if (hs) body += starHistoryHtml(hs);
+    if (!body) return '';
   }
   return `<div class="d-section">Stars</div>${body}`;
 }
 const STAR_NOTE_MAX_WORDS = 5;
 function starWords(text) { return text.split(/\s+/).filter(Boolean); }
-function limitStarNote(input) {
-  const w = starWords(input.value);
-  if (w.length > STAR_NOTE_MAX_WORDS) input.value = w.slice(0, STAR_NOTE_MAX_WORDS).join(' ');
-  const hint = document.getElementById('star-note-hint');
-  if (hint) { hint.textContent = `${Math.min(w.length, STAR_NOTE_MAX_WORDS)}/${STAR_NOTE_MAX_WORDS} words`; hint.style.color = ''; }
-}
-// Clicking the same button again collapses the open sub-panel; clicking the other one swaps to it.
-function toggleStarSub(sub, key) {
-  if (sub.dataset.mode === key && sub.innerHTML.trim()) { sub.innerHTML = ''; sub.dataset.mode = ''; return false; }
-  sub.dataset.mode = key;
-  return true;
-}
-function openStarPanel(nodeId, mode) {
-  const sub = document.getElementById('star-sub'); if (!sub) return;
-  if (!toggleStarSub(sub, mode)) return;
-  const owner = activeMember();
-  const others = data.members.filter(x => x.id !== (owner && owner.id) && isMemberCurrent(x));
-  if (!others.length) { sub.innerHTML = '<div class="star-hint">No other team members yet.</div>'; return; }
-  sub.innerHTML = `<div class="star-sub">
-    <div class="star-sub-title">Assign this star to</div>
-    <select id="star-member" class="star-input">${others.map(x => `<option value="${x.id}">${escapeHtml(x.name)}</option>`).join('')}</select>
-    <input id="star-note" class="star-input" maxlength="80" oninput="limitStarNote(this)" placeholder="What did they help with?">
-    <div class="star-hint" id="star-note-hint" style="margin-top:0">Required · 0/${STAR_NOTE_MAX_WORDS} words</div>
-    <div class="star-sub-actions">
-      <button class="btn btn-dismiss" type="button" onclick="document.getElementById('star-sub').innerHTML=''">Cancel</button>
-      <button class="btn btn-save" type="button" onclick="confirmStar('${nodeId}','${mode}')">Done</button>
-    </div></div>`;
-}
 async function submitStar(mode, nodeId, toId, note, project) {
   const m = activeMember(); if (!m || !canGiveStar()) return;
   const n = findNode(m, nodeId); if (!n) return;
@@ -2553,21 +2512,8 @@ async function submitStar(mode, nodeId, toId, note, project) {
     alert('Could not save the star — check your connection and permissions.');
   }
 }
-async function confirmStar(nodeId, mode) {
-  const noteInput = document.getElementById('star-note');
-  const nWords = starWords(noteInput.value).length;
-  if (nWords < 1 || nWords > STAR_NOTE_MAX_WORDS) {
-    const hint = document.getElementById('star-note-hint');
-    hint.textContent = nWords < 1 ? 'Please describe it in 1–5 words.' : `Please use at most ${STAR_NOTE_MAX_WORDS} words.`;
-    hint.style.color = '#b91c1c';
-    noteInput.focus();
-    return;
-  }
-  await submitStar(mode, nodeId, document.getElementById('star-member').value, starWords(noteInput.value).join(' '));
-}
-// ── Ask-for-a-star dialog: opened from the toolbar ★ Star button (adds a new Star node to the
-// Stars row) or from "Request a star" on an existing node's description panel.
-let askStarNodeId = null;
+// ── Ask-for-a-star dialog: opened from the toolbar ★ Ask for star button; adds a new Star node
+// to the Stars row (or under the selected star node there) and sends the request.
 function limitAskField(input, hintId) {
   const w = starWords(input.value);
   if (w.length > STAR_NOTE_MAX_WORDS) input.value = w.slice(0, STAR_NOTE_MAX_WORDS).join(' ');
@@ -2581,33 +2527,25 @@ function fillAskProjects() {
     : '';
 }
 function closeAskStarDialog() { document.getElementById('ov-star-ask').classList.remove('open'); }
-function openAskStarDialog(nodeId) {
+function openAskStarDialog() {
   const m = activeMember(); if (!m || !canGiveStar()) return;
   const others = data.members.filter(x => x.id !== m.id && isMemberCurrent(x));
   if (!others.length) { alert('No other team members to ask yet.'); return; }
-  const n = nodeId ? findNode(m, nodeId) : null;
-  if (nodeId && !n) return;
-  askStarNodeId = n ? n.id : null;
   const behalfEl = document.getElementById('ask-behalf');
   behalfEl.style.display = m.id !== myMemberId() ? '' : 'none';
   behalfEl.innerHTML = `Acting for <b>${escapeHtml(m.name)}</b> — as admin. The teammate still has to approve it.`;
-  document.getElementById('ask-title-wrap').style.display = n ? 'none' : '';
-  document.getElementById('ask-date-wrap').style.display = n ? 'none' : '';
   const dateInput = document.getElementById('ask-date');
   const bounds = dateRestrictionBounds(m);
   dateInput.value = todayStr(); dateInput.min = bounds.min || ''; dateInput.max = bounds.max || '';
-  const ex = document.getElementById('ask-existing');
-  ex.style.display = n ? '' : 'none'; ex.textContent = n ? n.text : '';
   document.getElementById('ask-title').value = '';
   const h = document.getElementById('ask-title-hint'); h.textContent = `Required · 0/${STAR_NOTE_MAX_WORDS} words`; h.style.color = '';
   document.getElementById('ask-member').innerHTML = others.map(x => `<option value="${x.id}">${escapeHtml(x.name)}</option>`).join('');
   fillAskProjects();
   document.getElementById('ov-star-ask').classList.add('open');
-  if (!n) document.getElementById('ask-title').focus();
+  document.getElementById('ask-title').focus();
 }
 async function confirmAskStar() {
   const m = activeMember(); if (!m || !canGiveStar()) return;
-  const existing = askStarNodeId ? findNode(m, askStarNodeId) : null;
   const check = (inputId, hintId) => {
     const input = document.getElementById(inputId), w = starWords(input.value);
     if (w.length >= 1 && w.length <= STAR_NOTE_MAX_WORDS) return w.join(' ');
@@ -2616,50 +2554,45 @@ async function confirmAskStar() {
     hint.style.color = '#b91c1c'; input.focus();
     return null;
   };
-  const title = existing ? existing.text : check('ask-title', 'ask-title-hint'); if (!title) return;
-  const dateVal = existing ? existing.date : document.getElementById('ask-date').value;
-  if (!existing) {
-    if (!dateVal) { alert('Please pick a date.'); return; }
-    if (!isDateAllowed(m, dateVal)) {
-      const { min, max } = dateRestrictionBounds(m);
-      const range = min && max ? `between ${min} and ${max}` : min ? `on or after ${min}` : `on or before ${max}`;
-      alert(`Your admin has restricted which dates you can use right now — pick a date ${range}.`);
-      return;
-    }
+  const title = check('ask-title', 'ask-title-hint'); if (!title) return;
+  const dateVal = document.getElementById('ask-date').value;
+  if (!dateVal) { alert('Please pick a date.'); return; }
+  if (!isDateAllowed(m, dateVal)) {
+    const { min, max } = dateRestrictionBounds(m);
+    const range = min && max ? `between ${min} and ${max}` : min ? `on or after ${min}` : `on or before ${max}`;
+    alert(`Your admin has restricted which dates you can use right now — pick a date ${range}.`);
+    return;
   }
   const toId = document.getElementById('ask-member').value;
   const projSel = document.getElementById('ask-project');
   const project = projSel.value ? { id: projSel.value, name: projSel.selectedOptions[0].text } : null;
   closeAskStarDialog();
-  let node = existing;
-  if (!node) {
-    const anchor = m.lastTopicId ? findNode(m, m.lastTopicId) : null;
-    if (anchor && inStarRow(m, anchor.id)) {
-      node = { id: genId(), text: title, date: dateVal, kind: 'star', bullets: [], createdAt: Date.now(), children: [] };
-      anchor.children = anchor.children || [];
-      anchor.children.push(node);
-      positionNewNode(m, node, anchor.id);
-    } else {
-      node = { id: genId(), text: title, date: dateVal, kind: 'star', bullets: [], createdAt: Date.now(), children: [], standalone: true, projectId: STAR_LANE_ID };
-      m.topics.push(node);
-    }
-    save();
+  let node;
+  const anchor = m.lastTopicId ? findNode(m, m.lastTopicId) : null;
+  if (anchor && inStarRow(m, anchor.id)) {
+    node = { id: genId(), text: title, date: dateVal, kind: 'star', bullets: [], createdAt: Date.now(), children: [] };
+    anchor.children = anchor.children || [];
+    anchor.children.push(node);
+    positionNewNode(m, node, anchor.id);
+  } else {
+    node = { id: genId(), text: title, date: dateVal, kind: 'star', bullets: [], createdAt: Date.now(), children: [], standalone: true, projectId: STAR_LANE_ID };
+    m.topics.push(node);
   }
+  save();
   await submitStar('ask', node.id, toId, '', project);
-  if (!existing) setTimeout(() => zoomToMapNode(node.id), 450);
+  setTimeout(() => zoomToMapNode(node.id), 450);
 }
-async function removeStar(starId) {
-  const s = starsList.find(x => x.id === starId); if (!s) return;
-  const m = activeMember(); if (!m) return;
-  const n = findNode(m, s.nodeId);
-  if (!isAdmin && !(isMyBoard() && s.fromId === m.id && (!n || canEditNode(n)))) return;
-  if (!confirm(`Remove this star${s.type === 'assign' ? ' from ' + s.toName : ''}? It will disappear from their board and star count.`)) return;
-  starsList = starsList.filter(x => x.id !== starId);
-  renderMemberSidebar(); buildD3Map();
-  const open = detailTopicId && document.getElementById('detail-panel').classList.contains('open');
-  if (open) { const dn = findNode(activeMember(), detailTopicId); if (dn) showTopicDetail(dn); }
-  try { await window.fbDeleteDoc(window.fbDoc('stars', starId)); }
-  catch (e) { console.error('Star delete failed', e); alert('Could not remove the star — check your connection and permissions.'); }
+// Deleting a star node withdraws its star right away: the requester's own request (or, for admin,
+// the request on whatever board they are deleting from), and — for admin — the star a received
+// node came from. A recipient deleting their own received node is handled by reconcileStars().
+// Deleting a red approved copy never revokes the star.
+function dropStarsForNode(node) {
+  const gone = starsList.filter(x => (x.type === 'ask' && x.nodeId === node.id) || (isAdmin && node.starFrom && x.id === node.starFrom.starId));
+  if (!gone.length) return;
+  const goneIds = new Set(gone.map(x => x.id));
+  starsList = starsList.filter(x => !goneIds.has(x.id));
+  gone.forEach(x => window.fbDeleteDoc(window.fbDoc('stars', x.id)).catch(e => console.error('Star delete failed', e)));
+  renderMemberSidebar();
 }
 // Keeps stars and boards consistent after a node is deleted or a star is withdrawn: a received
 // star-marked node whose star no longer exists loses its star marking; a received star whose node
