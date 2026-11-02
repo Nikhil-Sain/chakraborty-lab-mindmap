@@ -913,12 +913,74 @@ function save() {
   updateUndoButtons();
   pushMemberToFirestore(m);
 }
-async function pushMemberToFirestore(m) {
-  try { await window.fbSetDoc(window.fbDoc('members', m.id), m); }
-  catch (e) {
-    console.error('Firestore write failed', e);
-    alert('Could not save to the shared database — check your connection. Your change is only visible on this screen right now.');
-  }
+// Saves are batched: every edit marks the board dirty and the whole board is written once the
+// edits pause (~0.6s), instead of once per keystroke — typing a description used to send the
+// entire board to Firestore on every key. A pending board is also flushed when the tab is hidden
+// or closed, and the members listener keeps the local copy of a board that has an unsent edit.
+// Firestore rejects a document nested more than ~20 levels deep ("invalid nested entity"), and every
+// sub-node adds two levels. A board whose chain of sub-nodes gets deeper than FLAT_TREE_LEVEL is
+// therefore stored as a flat list of nodes (each with a parentId) and rebuilt into the tree on
+// load. Shallower boards are written in the original nested form, so nothing else changes.
+const FLAT_TREE_LEVEL = 5;
+function maxNodeLevel(nodes, level) {
+  let mx = nodes.length ? level : -1;
+  for (const n of nodes) mx = Math.max(mx, maxNodeLevel(n.children || [], level + 1));
+  return mx;
+}
+function memberToDoc(m) {
+  if (maxNodeLevel(m.topics || [], 0) <= FLAT_TREE_LEVEL) return m;
+  const flat = [];
+  (function walk(nodes, parentId) {
+    for (const n of nodes) {
+      const { children, ...rest } = n;
+      flat.push({ ...rest, parentId });
+      walk(children || [], n.id);
+    }
+  })(m.topics, null);
+  return { ...m, topics: flat, treeFormat: 'flat' };
+}
+function docToMember(d) {
+  if (d.treeFormat !== 'flat') return d;
+  const byId = {};
+  (d.topics || []).forEach(n => { const { parentId, ...rest } = n; byId[n.id] = { ...rest, children: [] }; });
+  const top = [];
+  (d.topics || []).forEach(n => {
+    const node = byId[n.id], parent = n.parentId && byId[n.parentId];
+    (parent ? parent.children : top).push(node);
+  });
+  const { treeFormat, ...rest } = d;
+  return { ...rest, topics: top };
+}
+const SAVE_DELAY_MS = 600;
+const pendingMemberWrites = {};
+let lastSaveAlertAt = 0;
+function pushMemberToFirestore(m) {
+  clearTimeout(pendingMemberWrites[m.id]);
+  pendingMemberWrites[m.id] = setTimeout(() => flushMemberWrite(m.id), SAVE_DELAY_MS);
+}
+async function flushMemberWrite(id) {
+  if (!(id in pendingMemberWrites)) return;
+  clearTimeout(pendingMemberWrites[id]); delete pendingMemberWrites[id];
+  const m = data.members.find(x => x.id === id); if (!m) return;
+  try { await window.fbSetDoc(window.fbDoc('members', id), memberToDoc(m)); }
+  catch (e) { reportSaveError(e); }
+}
+function flushAllMemberWrites() { Object.keys(pendingMemberWrites).forEach(flushMemberWrite); }
+window.addEventListener('pagehide', flushAllMemberWrites);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushAllMemberWrites(); });
+const SAVE_ERROR_HINTS = {
+  'resource-exhausted': "Firebase's usage limit for today may have been reached.",
+  'permission-denied': "You don't have permission to save this board.",
+  'invalid-argument': 'This board may be nested too deeply or too large for Firebase.',
+  'unavailable': 'Firebase could not be reached — check your connection.',
+  'unauthenticated': 'Your sign-in has expired — sign in again.'
+};
+function reportSaveError(e) {
+  const code = (e && e.code) || 'unknown';
+  console.error('Firestore write failed', code, e);
+  if (Date.now() - lastSaveAlertAt < 15000) return; // one alert per burst, not one per keystroke
+  lastSaveAlertAt = Date.now();
+  alert(`Could not save to the shared database (${code}). ${SAVE_ERROR_HINTS[code] || 'Check your connection.'} Your change is only visible on this screen right now.`);
 }
 // Used by admin actions on a member OTHER than the one currently on screen (renaming
 // someone from the sidebar, toggling their admin flag, etc.) — save() only ever writes
@@ -926,7 +988,7 @@ async function pushMemberToFirestore(m) {
 async function pushMemberPatch(memberId, patch) {
   const m = data.members.find(x => x.id === memberId); if (!m) return;
   Object.assign(m, patch);
-  await pushMemberToFirestore(m);
+  pushMemberToFirestore(m);
 }
 function updateUndoButtons() {
   // Scoped to whichever board is actually on screen — the stacks hold every board's history
@@ -1244,7 +1306,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const pw = document.getElementById('login-password');
   if (pw) pw.addEventListener('keydown', e => { if (e.key === 'Enter') handleLoginSubmit(); });
 });
-function handleSignOut() { window.fbSignOut(); }
+function handleSignOut() { flushAllMemberWrites(); window.fbSignOut(); }
 // Fires on every sign-in/sign-out, and once immediately with whatever the current state is.
 async function handleAuthChange(user) {
   firebaseUser = user;
@@ -1269,7 +1331,7 @@ async function handleAuthChange(user) {
   }
   viewMemberId = user.uid;
   unsubscribeMembers = window.fbOnSnapshot(window.fbCollection('members'), snapshot => {
-    data.members = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+    data.members = snapshot.docs.map(d => (d.id in pendingMemberWrites && data.members.find(x => x.id === d.id)) || ({ ...docToMember(d.data()), id: d.id }));
     const me = data.members.find(x => x.id === myMemberId());
     realIsAdmin = !!(me && me.isAdmin);
     applyAdminPreview();
